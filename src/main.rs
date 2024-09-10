@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use bytes::BytesMut;
 use chrono::Local;
 use futures::Stream;
 use pgwire::{
@@ -15,9 +16,8 @@ use pgwire::{
     tokio::process_socket,
 };
 use std::sync::Arc;
-use tokio::net::TcpListener;
-use tokio::sync::Mutex;
-use tokio_postgres::{Client, NoTls, Row, Statement};
+use tokio::{net::TcpListener, sync::Mutex};
+use tokio_postgres::{types::Type, Client, NoTls, Row, Statement};
 
 pub struct Processor {
     client: Arc<Mutex<Client>>,
@@ -44,22 +44,21 @@ impl SimpleQueryHandler for Processor {
             let stmt = client
                 .prepare(query)
                 .await
-                .map_err(|e| PgWireError::ApiError(Box::new(e)))
-                .unwrap();
-
-            // let header = Arc::new(row_desc_from_stmt(&stmt, &Format::UnifiedText).unwrap());
-            client
-                .query(query, &[])
+                .map_err(|e| PgWireError::ApiError(Box::new(e)))?;
+            let rows = client
+                .query(&stmt, &[])
                 .await
-                .map(|rows| {
-                    vec![Response::Execution(
-                        Tag::new("OK").with_rows(rows.len().try_into().unwrap()),
-                    )]
-                    // let s = encode_row_data(rows, header.clone());
-                    // let s =
-                    // vec![Response::Query(QueryResponse::new(header, s))]
-                })
-                .map_err(|e| PgWireError::ApiError(Box::new(e)))
+                .map_err(|e| PgWireError::ApiError(Box::new(e)))?;
+
+            let field_info = row_desc_from_stmt(&stmt, &Format::UnifiedText)?;
+            let field_info_arc = Arc::new(field_info);
+
+            let data_rows = encode_row_data(rows, field_info_arc.clone());
+
+            Ok(vec![Response::Query(QueryResponse::new(
+                field_info_arc,
+                Box::pin(data_rows),
+            ))])
         } else {
             if query.starts_with("UPDATE") {
                 println!(
@@ -123,20 +122,56 @@ fn row_desc_from_stmt(stmt: &Statement, format: &Format) -> PgWireResult<Vec<Fie
         .collect()
 }
 
-// fn encode_row_data(
-//     mut rows: Vec<Row>,
-//     schema: Arc<Vec<FieldInfo>>
-// ) -> impl Stream<Item = PgWireResult<DataRow>>{
-//     let mut results = Vec::new();
-//     let ncols = schema.len();
+fn encode_row_data(
+    rows: Vec<Row>,
+    schema: Arc<Vec<FieldInfo>>,
+) -> impl Stream<Item = PgWireResult<DataRow>> {
+    futures::stream::iter(rows.into_iter().map(move |row| {
+        let mut buffer = BytesMut::new();
+        for (idx, field) in schema.iter().enumerate() {
+            let pg_type = field.datatype();
+            match pg_type {
+                &Type::INT4 => {
+                    let value: Option<i32> = row.get(idx);
+                    encode_value(&mut buffer, value.map(|v| v.to_string()));
+                }
+                &Type::TEXT | &Type::VARCHAR => {
+                    let value: Option<String> = row.get(idx);
+                    encode_value(&mut buffer, value);
+                }
+                &Type::BOOL => {
+                    let value: Option<bool> = row.get(idx);
+                    encode_value(&mut buffer, value.map(|v| v.to_string()));
+                }
+                &Type::FLOAT4 => {
+                    let value: Option<f32> = row.get(idx);
+                    encode_value(&mut buffer, value.map(|v| v.to_string()));
+                }
+                &Type::FLOAT8 => {
+                    let value: Option<f64> = row.get(idx);
+                    encode_value(&mut buffer, value.map(|v| v.to_string()));
+                }
+                _ => {
+                    encode_value(&mut buffer, None::<String>);
+                    println!("Unexpected Type")
+                }
+            }
+        }
+        Ok(DataRow::new(buffer, schema.len() as i16))
+    }))
+}
 
-//     for row in rows.iter_mut() {
-//     }
-//     // while let Ok(Some(row)) =  {
-
-//     // }
-//     // Ok(DataRow::new(row.into_iter(), ncols.try_into().unwrap()))
-// }
+fn encode_value(buffer: &mut BytesMut, value: Option<String>) {
+    match value {
+        Some(v) => {
+            buffer.extend_from_slice(&(v.len() as i32).to_be_bytes());
+            buffer.extend_from_slice(v.as_bytes());
+        }
+        None => {
+            buffer.extend_from_slice(&(-1_i32).to_be_bytes());
+        }
+    }
+}
 
 struct ProcessorFactory {
     handler: Arc<Processor>,
@@ -174,7 +209,7 @@ async fn create_db_if_not_exists() {
         }
     });
 
-    client.execute("CREATE DATABASE new", &[]).await.unwrap();
+    let _ = client.execute("CREATE DATABASE new", &[]).await;
 
     println!("Database 'new' created successfully!");
 }

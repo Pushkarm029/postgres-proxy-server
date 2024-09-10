@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 async-trait = "0.1.82"
+bytes = "1.7.1"
 chrono = "0.4.38"
 futures = "0.3.30"
 pgwire = "0.24.1"
