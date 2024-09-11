@@ -104,6 +104,11 @@ This project is a Postgres proxy server written in Rust using the PGWire protoco
    [yyyy-mm-dd HH:MM:SS WARNING] UPDATE operation detected! ⚠️ This will modify existing data.
    ```
 
+4. **Read Data (READ Operation):**
+   ```sql
+   SELECT * FROM users;
+   ```
+
 ### Notes:
 - The server logs will display warnings when `WRITE` or `UPDATE` queries are executed, as they can potentially overwrite data.
 - Logs can be viewed in the terminal where the Rust server is running.
