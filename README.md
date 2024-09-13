@@ -1,3 +1,81 @@
+# MVP
+
+### Steps to Run:
+
+1. **Pull Postgres on Docker:**
+   ```bash
+   docker pull postgres
+   ```
+
+2. **Start Postgres:**
+   ```bash
+   docker run --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres
+   ```
+
+3. **Run the PGWire Server:**
+   ```bash
+   # It will automatically create a database "new" and run functions on it
+   cargo run
+   ```
+
+4. **Install Postgres Client (`psql`):**
+   
+   If you don’t have `psql` installed, follow the steps for your platform:
+
+   - **Check if `psql` is already installed:**
+     ```bash
+     psql --version
+     ```
+
+   - **For MacOS:**
+     ```bash
+     brew doctor
+     brew update
+     brew install libpq
+     brew link --force libpq
+     ```
+
+   - **For Ubuntu 23.10, 22.04, and Debian 12:**
+     ```bash
+     sudo apt update
+     sudo apt install postgresql-client
+     ```
+
+   - **Verify Installation:**
+     ```bash
+     psql --version
+     ```
+
+5. **Connect to the Main Server:**
+   
+   Open a terminal and run the following command to connect to the PGWire proxy server:
+   ```bash
+   psql postgres://postgres:postgres@127.0.0.1:5432/information_schema
+   ```
+
+   CREATE database information_schema;
+   \c information_schema
+
+6. **Populate information_schema**
+
+   Create a new db in same instance, and connect to it.
+   populate it
+   
+   ```sql
+   CREATE TABLE information_schema.measures (
+      name TEXT PRIMARY KEY,
+      query TEXT
+   );
+
+   INSERT INTO information_schema.measures (name, query)
+   VALUES
+      ('head_count', 'count(id)'),
+      ('revenue', 'sum(amount)'),
+      ('average_salary', 'avg(salary)');
+   ```
+
+   check it: SELECT * from information_schema.measures;
+
 # Postgres Proxy Server
 
 This project is a Postgres proxy server written in Rust using the PGWire protocol. It allows you to run a lightweight server and interact with it using `psql` or any other Postgres client.
@@ -52,7 +130,7 @@ This project is a Postgres proxy server written in Rust using the PGWire protoco
    
    Open a terminal and run the following command to connect to the PGWire proxy server:
    ```bash
-   psql postgresql://admin:admin@127.0.0.1:5433/new
+   psql postgres://postgres:postgres@127.0.0.1:5433/new
    ```
 
 6. **Run Queries:**

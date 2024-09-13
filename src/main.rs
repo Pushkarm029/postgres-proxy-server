@@ -15,16 +15,23 @@ use pgwire::{
     messages::data::DataRow,
     tokio::process_socket,
 };
+use sqlx::{postgres::PgConnection, Connection};
 use std::sync::Arc;
 use tokio::{net::TcpListener, sync::Mutex};
 use tokio_postgres::{types::Type, Client, NoTls, Row, Statement};
+// It also provides a SnowflakeSqlDialect which may be useful for us?
+use sqlparser::parser::Parser;
+use sqlparser::{ast::FunctionArguments, dialect::PostgreSqlDialect};
+// use sqlparser::parser::
+use sqlparser::ast::{Expr, SelectItem};
 
 pub struct Processor {
     client: Arc<Mutex<Client>>,
 }
 
-const ADDRESS: &str = "postgres://postgres:postgres@localhost:5432";
+// const ADDRESS: &str = "postgres://postgres:postgres@localhost:5432";
 const DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432/new";
+const SCHEMA_DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432/information_schema";
 
 #[async_trait]
 impl SimpleQueryHandler for Processor {
@@ -39,6 +46,14 @@ impl SimpleQueryHandler for Processor {
             query
         );
         let client = self.client.lock().await;
+
+        // parse sql
+        let dialect = PostgreSqlDialect {};
+
+        let mut ast = Parser::parse_sql(&dialect, query)
+            .unwrap_or_else(|e| panic!("Fails to parse the sql to AST: {}", e));
+
+        replace_measure_with_expression(&mut ast);
 
         if query.to_uppercase().starts_with("SELECT") {
             let stmt = client
@@ -65,14 +80,27 @@ impl SimpleQueryHandler for Processor {
                     "[{} WARNING] UPDATE operation detected! ⚠️ This will modify existing data.",
                     Local::now().format("%Y-%m-%d %H:%M:%S")
                 );
+                return Err(PgWireError::ApiError(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "UPDATE query is not Accepted",
+                ))));
             }
 
             if query.starts_with("WRITE") || query.starts_with("INSERT") {
+                // TODO: use logger here
                 println!(
                     "[{} WARNING] WRITE operation detected! ⚠️ Writing new data may impact database integrity if not handled carefully.",
                     Local::now().format("%Y-%m-%d %H:%M:%S")
                 );
+                return Err(PgWireError::ApiError(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "WRITE or INSERT query is not Accepted",
+                ))));
             }
+
+            // if it contains MEASURE keyword
+            // generate sql query to get the data from information_schema: to get count(id) for head_count
+            // call get_query_schema fn here
 
             client
                 .execute(query, &[])
@@ -85,6 +113,81 @@ impl SimpleQueryHandler for Processor {
                 .map_err(|e| PgWireError::ApiError(Box::new(e)))
         }
     }
+}
+
+fn replace_measure_with_expression(ast: &mut [sqlparser::ast::Statement]) {
+    // for statement in ast.iter_mut() {
+    //     if let sqlparser::ast::Statement::Query(query) = statement {
+    //         if let Query {
+    //             body: sqlparser::ast::SetExpr::Select(select),
+    //             ..
+    //         } = query.as_mut()
+    //         {
+    //             for projection in select.projection.iter_mut() {
+    //                 // Check if it's a function like MEASURE()
+    //                 if let SelectItem::UnnamedExpr(Expr::Function(func)) = projection {
+    //                     if func.name.0[0].value == "MEASURE" {
+    //                         // Replace with "yoyooyoyo(id)"
+    //                         *projection = SelectItem::UnnamedExpr(Expr::Function(Function {
+    //                             name: ObjectName(vec![Ident::new("yoyooyoyo")]),
+    //                             args: vec![Expr::Identifier(Ident::new("id")).into()],
+    //                             ..func.clone()
+    //                         }));
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+    for statement in ast.iter_mut() {
+        if let sqlparser::ast::Statement::Query(query) = statement {
+            println!("[DEBUG] Original AST -> {:?}", query.body);
+            let body = &query.body;
+
+            if let sqlparser::ast::SetExpr::Select(mut select) = *body.clone() {
+                for proj in select.projection.iter_mut() {
+                    if let SelectItem::UnnamedExpr(Expr::Function(ref mut func)) = proj {
+                        if func.name.0[0].value == "MEASURE" {
+                            // *proj
+                            let curr_arg = func.args.clone();
+                            println!("ARGS {curr_arg}");
+
+                            // left the subquery part
+                            if let FunctionArguments::List(ref mut list) = func.args {
+                                for item in list.args.iter_mut() {
+                                    let str = item.to_string();
+                                    println!("str: {}", str);
+
+                                    // now modify
+                                }
+                            }
+                            // func.args = FunctionArguments
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[derive(sqlx::FromRow, Debug, PartialEq, Eq)]
+struct Qu(String);
+
+async fn get_query_from_schema(old: String) -> String {
+    // let mut conn: sqlx::Connection::Database;
+    let mut conn = PgConnection::connect(SCHEMA_DB_ADDRESS)
+        .await
+        .unwrap_or_else(|e| panic!("Failed to connect to database: {}", e));
+
+    let new_query: Qu = sqlx::query_as(&format!(
+        "SELECT query FROM information_schema.measures WHERE name = '{}';",
+        old
+    ))
+    .fetch_one(&mut conn)
+    .await
+    .unwrap();
+
+    new_query.0
 }
 
 impl Processor {
@@ -200,23 +303,23 @@ impl PgWireHandlerFactory for ProcessorFactory {
     }
 }
 
-async fn create_db_if_not_exists() {
-    let (client, connection) = tokio_postgres::connect(ADDRESS, NoTls).await.unwrap();
+// async fn create_db_if_not_exists() {
+//     let (client, connection) = tokio_postgres::connect(ADDRESS, NoTls).await.unwrap();
 
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("connection error: {}", e);
-        }
-    });
+//     tokio::spawn(async move {
+//         if let Err(e) = connection.await {
+//             eprintln!("connection error: {}", e);
+//         }
+//     });
 
-    let _ = client.execute("CREATE DATABASE new", &[]).await;
+//     let _ = client.execute("CREATE DATABASE new", &[]).await;
 
-    println!("Database 'new' created successfully!");
-}
+//     println!("Database 'new' created successfully!");
+// }
 
 #[tokio::main]
 pub async fn main() {
-    create_db_if_not_exists().await;
+    // create_db_if_not_exists().await;
 
     let factory = Arc::new(ProcessorFactory {
         handler: Arc::new(Processor::new().await),
@@ -236,6 +339,13 @@ pub async fn main() {
         "[{} INFO] Listening for connections on {}",
         Local::now().format("%Y-%m-%d %H:%M:%S"),
         server_addr
+    );
+
+    let res = get_query_from_schema("head_count".to_string()).await;
+    println!(
+        "[{} INFO] Response from information schema: {}",
+        Local::now().format("%Y-%m-%d %H:%M:%S"),
+        res
     );
 
     loop {
