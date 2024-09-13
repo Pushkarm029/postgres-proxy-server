@@ -38,26 +38,32 @@ impl SimpleQueryHandler for Processor {
     async fn do_query<'a, C>(
         &self,
         _client: &mut C,
-        query: &'a str,
+        initial_query: &'a str,
     ) -> PgWireResult<Vec<Response<'a>>> {
         println!(
             "[{} INFO] Received query: {:?}",
             Local::now().format("%Y-%m-%d %H:%M:%S"),
-            query
+            initial_query
         );
         let client = self.client.lock().await;
 
         // parse sql
         let dialect = PostgreSqlDialect {};
 
-        let mut ast = Parser::parse_sql(&dialect, query)
+        let mut ast = Parser::parse_sql(&dialect, initial_query)
             .unwrap_or_else(|e| panic!("Fails to parse the sql to AST: {}", e));
 
-        replace_measure_with_expression(&mut ast);
+        replace_measure_with_expression(&mut ast).await;
+
+        let query = ast[0].to_string();
+        println!("Query -> {}", query);
+
+        // now, unparse the AST
+        // pass this query
 
         if query.to_uppercase().starts_with("SELECT") {
             let stmt = client
-                .prepare(query)
+                .prepare(&query)
                 .await
                 .map_err(|e| PgWireError::ApiError(Box::new(e)))?;
             let rows = client
@@ -103,7 +109,7 @@ impl SimpleQueryHandler for Processor {
             // call get_query_schema fn here
 
             client
-                .execute(query, &[])
+                .execute(&query, &[])
                 .await
                 .map(|affected_rows| {
                     vec![Response::Execution(
@@ -115,30 +121,7 @@ impl SimpleQueryHandler for Processor {
     }
 }
 
-fn replace_measure_with_expression(ast: &mut [sqlparser::ast::Statement]) {
-    // for statement in ast.iter_mut() {
-    //     if let sqlparser::ast::Statement::Query(query) = statement {
-    //         if let Query {
-    //             body: sqlparser::ast::SetExpr::Select(select),
-    //             ..
-    //         } = query.as_mut()
-    //         {
-    //             for projection in select.projection.iter_mut() {
-    //                 // Check if it's a function like MEASURE()
-    //                 if let SelectItem::UnnamedExpr(Expr::Function(func)) = projection {
-    //                     if func.name.0[0].value == "MEASURE" {
-    //                         // Replace with "yoyooyoyo(id)"
-    //                         *projection = SelectItem::UnnamedExpr(Expr::Function(Function {
-    //                             name: ObjectName(vec![Ident::new("yoyooyoyo")]),
-    //                             args: vec![Expr::Identifier(Ident::new("id")).into()],
-    //                             ..func.clone()
-    //                         }));
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
+async fn replace_measure_with_expression(ast: &mut [sqlparser::ast::Statement]) {
     for statement in ast.iter_mut() {
         if let sqlparser::ast::Statement::Query(query) = statement {
             println!("[DEBUG] Original AST -> {:?}", query.body);
@@ -158,10 +141,12 @@ fn replace_measure_with_expression(ast: &mut [sqlparser::ast::Statement]) {
                                     let str = item.to_string();
                                     println!("str: {}", str);
 
-                                    // now modify
+                                    let new = get_query_from_schema(str).await;
+                                    
+                                    // convert into this type
+                                    // *item = new.into();
                                 }
                             }
-                            // func.args = FunctionArguments
                         }
                     }
                 }
