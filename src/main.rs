@@ -20,16 +20,17 @@ use std::sync::Arc;
 use tokio::{net::TcpListener, sync::Mutex};
 use tokio_postgres::{types::Type, Client, NoTls, Row, Statement};
 // It also provides a SnowflakeSqlDialect which may be useful for us?
-use sqlparser::parser::Parser;
-use sqlparser::{ast::FunctionArguments, dialect::PostgreSqlDialect};
-// use sqlparser::parser::
 use sqlparser::ast::{Expr, SelectItem};
+use sqlparser::{ast::FunctionArguments, dialect::PostgreSqlDialect};
+use sqlparser::{
+    ast::{FunctionArg, FunctionArgExpr, Ident},
+    parser::Parser,
+};
 
 pub struct Processor {
     client: Arc<Mutex<Client>>,
 }
 
-// const ADDRESS: &str = "postgres://postgres:postgres@localhost:5432";
 const DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432/new";
 const SCHEMA_DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432/information_schema";
 
@@ -49,14 +50,14 @@ impl SimpleQueryHandler for Processor {
 
         // parse sql
         let dialect = PostgreSqlDialect {};
-
         let mut ast = Parser::parse_sql(&dialect, initial_query)
             .unwrap_or_else(|e| panic!("Fails to parse the sql to AST: {}", e));
 
         replace_measure_with_expression(&mut ast).await;
 
         let query = ast[0].to_string();
-        println!("Query -> {}", query);
+        println!("Old Query -> {}", initial_query);
+        println!("New Query -> {}", query);
 
         // now, unparse the AST
         // pass this query
@@ -104,10 +105,6 @@ impl SimpleQueryHandler for Processor {
                 ))));
             }
 
-            // if it contains MEASURE keyword
-            // generate sql query to get the data from information_schema: to get count(id) for head_count
-            // call get_query_schema fn here
-
             client
                 .execute(&query, &[])
                 .await
@@ -124,27 +121,17 @@ impl SimpleQueryHandler for Processor {
 async fn replace_measure_with_expression(ast: &mut [sqlparser::ast::Statement]) {
     for statement in ast.iter_mut() {
         if let sqlparser::ast::Statement::Query(query) = statement {
-            println!("[DEBUG] Original AST -> {:?}", query.body);
-            let body = &query.body;
-
-            if let sqlparser::ast::SetExpr::Select(mut select) = *body.clone() {
+            if let sqlparser::ast::SetExpr::Select(select) = query.body.as_mut() {
                 for proj in select.projection.iter_mut() {
-                    if let SelectItem::UnnamedExpr(Expr::Function(ref mut func)) = proj {
+                    if let SelectItem::UnnamedExpr(Expr::Function(func)) = proj {
                         if func.name.0[0].value == "MEASURE" {
-                            // *proj
-                            let curr_arg = func.args.clone();
-                            println!("ARGS {curr_arg}");
-
-                            // left the subquery part
-                            if let FunctionArguments::List(ref mut list) = func.args {
+                            if let FunctionArguments::List(list) = &mut func.args {
                                 for item in list.args.iter_mut() {
-                                    let str = item.to_string();
-                                    println!("str: {}", str);
-
-                                    let new = get_query_from_schema(str).await;
-                                    
-                                    // convert into this type
-                                    // *item = new.into();
+                                    *item = FunctionArg::Unnamed(FunctionArgExpr::Expr(
+                                        Expr::Identifier(Ident::new(
+                                            get_query_from_schema(item.to_string()).await,
+                                        )),
+                                    ));
                                 }
                             }
                         }
@@ -156,23 +143,22 @@ async fn replace_measure_with_expression(ast: &mut [sqlparser::ast::Statement]) 
 }
 
 #[derive(sqlx::FromRow, Debug, PartialEq, Eq)]
-struct Qu(String);
+struct SchemaQuery(String);
 
-async fn get_query_from_schema(old: String) -> String {
-    // let mut conn: sqlx::Connection::Database;
+async fn get_query_from_schema(old_arg: String) -> String {
     let mut conn = PgConnection::connect(SCHEMA_DB_ADDRESS)
         .await
         .unwrap_or_else(|e| panic!("Failed to connect to database: {}", e));
 
-    let new_query: Qu = sqlx::query_as(&format!(
+    let new_arg: SchemaQuery = sqlx::query_as(&format!(
         "SELECT query FROM information_schema.measures WHERE name = '{}';",
-        old
+        old_arg
     ))
     .fetch_one(&mut conn)
     .await
     .unwrap();
 
-    new_query.0
+    new_arg.0
 }
 
 impl Processor {
@@ -210,6 +196,7 @@ fn row_desc_from_stmt(stmt: &Statement, format: &Format) -> PgWireResult<Vec<Fie
         .collect()
 }
 
+// Use SQLx
 fn encode_row_data(
     rows: Vec<Row>,
     schema: Arc<Vec<FieldInfo>>,
@@ -288,30 +275,13 @@ impl PgWireHandlerFactory for ProcessorFactory {
     }
 }
 
-// async fn create_db_if_not_exists() {
-//     let (client, connection) = tokio_postgres::connect(ADDRESS, NoTls).await.unwrap();
-
-//     tokio::spawn(async move {
-//         if let Err(e) = connection.await {
-//             eprintln!("connection error: {}", e);
-//         }
-//     });
-
-//     let _ = client.execute("CREATE DATABASE new", &[]).await;
-
-//     println!("Database 'new' created successfully!");
-// }
-
 #[tokio::main]
 pub async fn main() {
-    // create_db_if_not_exists().await;
-
     let factory = Arc::new(ProcessorFactory {
         handler: Arc::new(Processor::new().await),
     });
 
     let server_addr = "127.0.0.1:5433";
-
     println!(
         "[{} INFO] Starting server at {}",
         Local::now().format("%Y-%m-%d %H:%M:%S"),
@@ -319,24 +289,15 @@ pub async fn main() {
     );
 
     let listener = TcpListener::bind(server_addr).await.unwrap();
-
     println!(
         "[{} INFO] Listening for connections on {}",
         Local::now().format("%Y-%m-%d %H:%M:%S"),
         server_addr
     );
 
-    let res = get_query_from_schema("head_count".to_string()).await;
-    println!(
-        "[{} INFO] Response from information schema: {}",
-        Local::now().format("%Y-%m-%d %H:%M:%S"),
-        res
-    );
-
     loop {
         let incoming_socket = listener.accept().await.unwrap();
         let factory_ref = factory.clone();
-
         println!(
             "[{} INFO] New connection accepted from: {}",
             Local::now().format("%Y-%m-%d %H:%M:%S"),
