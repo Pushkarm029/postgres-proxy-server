@@ -194,3 +194,6 @@ This project is a Postgres proxy server written in Rust using the PGWire protoco
 ### Troubleshooting:
 - If the connection to the proxy server fails, ensure the server is running and that port `5433` is open.
 - Verify that your PostgreSQL client is correctly installed by running `psql --version`.
+
+
+### Steps to Test

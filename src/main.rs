@@ -16,7 +16,7 @@ use pgwire::{
     tokio::process_socket,
 };
 use sqlx::{postgres::PgConnection, Connection};
-use std::sync::Arc;
+use std::{env, sync::Arc};
 use tokio::{net::TcpListener, sync::Mutex};
 use tokio_postgres::{types::Type, Client, NoTls, Row, Statement};
 // It also provides a SnowflakeSqlDialect which may be useful for us?
@@ -31,8 +31,9 @@ pub struct Processor {
     client: Arc<Mutex<Client>>,
 }
 
-const DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432/new";
-const SCHEMA_DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432/information_schema";
+const SCHEMA_DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432/custom_schema";
+const DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432/test_db";
+// let db_address: String = env::var("DB_NAME").unwrap_or_else(|_| "new".to_string());
 
 #[async_trait]
 impl SimpleQueryHandler for Processor {
