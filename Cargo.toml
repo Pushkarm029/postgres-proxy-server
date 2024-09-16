@@ -9,5 +9,8 @@ bytes = "1.7.1"
 chrono = "0.4.38"
 futures = "0.3.30"
 pgwire = "0.24.1"
+sqlparser = "0.51.0"
+# tokio (no TLS)
+sqlx = { version = "0.8", features = [ "runtime-tokio", "postgres" ] }
 tokio = { version = "1.40.0", features = ["full"] }
 tokio-postgres = "0.7.11"
