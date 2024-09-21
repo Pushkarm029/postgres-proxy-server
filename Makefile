@@ -6,6 +6,15 @@ DB_PASSWORD = postgres
 DB_HOST = localhost
 DB_PORT = 5432
 
+# setup-db
+# 
+
+setup-db:
+	@echo "Starting Postgres container..."
+	@docker run --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres
+	@echo "Waiting for Postgres to be ready..."
+	@sleep 2
+
 .PHONY: all test setup teardown run-proxy populate-db run-tests clean
 
 test: setup create-db populate-db run-proxy run-tests

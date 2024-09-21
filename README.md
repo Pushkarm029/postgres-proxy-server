@@ -12,6 +12,74 @@
    docker run --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres
    ```
 
+   3. **Install Postgres Client (`psql`):**
+   
+   If you don’t have `psql` installed, follow the steps for your platform:
+
+   - **Check if `psql` is already installed:**
+     ```bash
+     psql --version
+     ```
+
+   - **For MacOS:**
+     ```bash
+     brew doctor
+     brew update
+     brew install libpq
+     brew link --force libpq
+     ```
+
+   - **For Ubuntu 23.10, 22.04, and Debian 12:**
+     ```bash
+     sudo apt update
+     sudo apt install postgresql-client
+     ```
+
+   - **Verify Installation:**
+     ```bash
+     psql --version
+     ```
+
+
+3. **Create & Populate information_schema**
+   ```bash
+   # connect to postgres
+   psql postgres://postgres:postgres@127.0.0.1:5432
+
+   # create database
+   CREATE database information_schema;
+
+   # switch to this database
+   \c information_schema
+
+   # create table measures
+   CREATE TABLE IF NOT EXISTS measures (
+                name TEXT PRIMARY KEY,
+                query TEXT NOT NULL
+            );
+
+   # populate db
+   INSERT INTO measures (name, query) VALUES ('head_count', 'COUNT(id)'), ('revenue', 'SUM(amount)'), ('average_salary', 'AVG(salary)');
+   ```
+
+3. **Create & Populate main database**
+      ```bash
+   # create database
+   CREATE database main;
+
+   # switch to this database
+   \c main
+
+   # create table measures
+   CREATE TABLE IF NOT EXISTS measures (
+                name TEXT PRIMARY KEY,
+                query TEXT NOT NULL
+            );
+
+   # populate db
+   INSERT INTO measures (name, query) VALUES ('head_count', 'COUNT(id)'), ('revenue', 'SUM(amount)'), ('average_salary', 'AVG(salary)');
+   ```
+
 3. **Run the PGWire Server:**
    ```bash
    # It will automatically create a database "new" and run functions on it
