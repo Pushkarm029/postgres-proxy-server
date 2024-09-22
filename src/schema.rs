@@ -10,19 +10,14 @@ pub async fn replace_measure_with_expression(ast: &mut [Statement]) {
                 for proj in select.projection.iter_mut() {
                     if let SelectItem::UnnamedExpr(Expr::Function(func)) = proj {
                         if func.name.0[0].value == "MEASURE" {
-                            let mut new_qq = String::new();
+                            let mut new_item = String::new();
                             if let FunctionArguments::List(list) = &mut func.args {
                                 for item in list.args.iter_mut() {
-                                    // *item = FunctionArg::Unnamed(FunctionArgExpr::Expr(
-                                    //     Expr::Identifier(Ident::new(
-                                    //         get_query_from_schema(item.to_string()).await,
-                                    //     )),
-                                    // ));
-                                    new_qq = get_query_from_schema(item.to_string()).await;
+                                    new_item = get_query_from_schema(item.to_string()).await;
                                 }
                             }
                             *func = Function {
-                                name: ObjectName(vec![Ident::new(new_qq)]),
+                                name: ObjectName(vec![Ident::new(new_item)]),
                                 args: FunctionArguments::None,
                                 over: None,
                                 parameters: FunctionArguments::None,

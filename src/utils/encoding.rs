@@ -58,6 +58,10 @@ pub fn encode_row_data(
                     let value: Option<f64> = row.get(idx);
                     encode_value(&mut buffer, value.map(|v| v.to_string()));
                 }
+                &Type::INT8 => {
+                    let value: Option<i64> = row.get(idx);
+                    encode_value(&mut buffer, value.map(|v| v.to_string()));
+                }
                 _ => {
                     encode_value(&mut buffer, None::<String>);
                     error!("Unexpected Type")

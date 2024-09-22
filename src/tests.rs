@@ -119,9 +119,7 @@ async fn e2e_test() {
     // main();
 
     // Run TCP Server in another runtime
-    let handler = thread::spawn(|| {
-        main()
-    });
+    let handler = thread::spawn(|| main());
     // let _some = thread::spawn(|| {
     //     main();
     // }).join().expect("Thread Panicked");
@@ -167,7 +165,10 @@ async fn e2e_test() {
 
     // Test a regular SELECT query
 
-    let sss= query("SELECT * FROM users;").fetch_all(&proxy_pool).await.unwrap();
+    let sss = query("SELECT * FROM users;")
+        .fetch_all(&proxy_pool)
+        .await
+        .unwrap();
     // let (client, _connection) = tokio_postgres::connect(PROXY_DB_ADDRESS, NoTls)
     // .await
     // .expect("Failed to connect to database");
