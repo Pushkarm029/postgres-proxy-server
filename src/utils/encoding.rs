@@ -38,6 +38,10 @@ pub fn encode_row_data(
                     let value: Option<i32> = row.get(idx);
                     encode_value(&mut buffer, value.map(|v| v.to_string()));
                 }
+                &Type::NUMERIC => {
+                    let value: Option<rust_decimal::Decimal> = row.get(idx);
+                    encode_value(&mut buffer, value.map(|v| v.to_string()));
+                }
                 &Type::TEXT | &Type::VARCHAR => {
                     let value: Option<String> = row.get(idx);
                     encode_value(&mut buffer, value);

@@ -21,8 +21,15 @@ test:
 	SCHEMA_DB_ADDRESS="postgres://postgres:postgres@localhost:5432/test_schema" \
 	SCHEMA_TABLE_NAME="measures" \
 	RUST_LOG=info \
-	RUST_BACKTRACE=1 \
 	$(CARGO) test
+
+debug-run: 	
+	@echo "Running tests..."
+	@DB_ADDRESS="postgres://postgres:postgres@localhost:5432/test_db" \
+	SCHEMA_DB_ADDRESS="postgres://postgres:postgres@localhost:5432/test_schema" \
+	SCHEMA_TABLE_NAME="measures" \
+	RUST_LOG=info \
+	$(CARGO) run
 
 setup-db:
 	@echo "Starting Postgres container..."
@@ -30,7 +37,7 @@ setup-db:
 	@echo "Waiting for Postgres to be ready..."
 	@sleep 2
 
-.PHONY: all test setup teardown run-proxy populate-db run-tests clean
+.PHONY: all test setup teardown run-proxy populate-db run-tests clean debug-run
 
 # test: setup create-db populate-db run-proxy run-tests
 

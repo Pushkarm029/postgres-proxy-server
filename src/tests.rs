@@ -119,7 +119,7 @@ async fn e2e_test() {
     // main();
 
     // Run TCP Server in another runtime
-    thread::spawn(|| {
+    let handler = thread::spawn(|| {
         main()
     });
     // let _some = thread::spawn(|| {
@@ -139,6 +139,7 @@ async fn e2e_test() {
         .await
         .unwrap();
 
+    // handler.join();
     // let pool: tokio::task::JoinHandle<Pool<Postgres>> = tokio::spawn(async {
     //     PgPoolOptions::new().connect(PROXY_DB_ADDRESS).await.unwrap()
     // });
