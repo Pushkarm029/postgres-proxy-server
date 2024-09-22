@@ -1,5 +1,6 @@
 use bytes::BytesMut;
 use futures::Stream;
+use log::error;
 use pgwire::api::portal::Format;
 use pgwire::api::results::FieldInfo;
 use pgwire::error::PgWireResult;
@@ -55,7 +56,7 @@ pub fn encode_row_data(
                 }
                 _ => {
                     encode_value(&mut buffer, None::<String>);
-                    println!("Unexpected Type")
+                    error!("Unexpected Type")
                 }
             }
         }

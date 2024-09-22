@@ -6,8 +6,9 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1.82"
 bytes = "1.7.1"
-chrono = "0.4.38"
+env_logger = "0.11.5"
 futures = "0.3.30"
+log = "0.4.22"
 pgwire = "0.24.1"
 sqlparser = "0.51.0"
 # tokio (no TLS)

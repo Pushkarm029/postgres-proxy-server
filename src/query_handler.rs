@@ -1,4 +1,4 @@
-use chrono::Local;
+use log::{debug, info, warn};
 use pgwire::api::{
     portal::Format,
     results::{QueryResponse, Response, Tag},
@@ -17,11 +17,7 @@ pub async fn handle_query(
     client: Arc<Mutex<Client>>,
     initial_query: &str,
 ) -> PgWireResult<Vec<Response>> {
-    println!(
-        "[{} INFO] Received query: {:?}",
-        Local::now().format("%Y-%m-%d %H:%M:%S"),
-        initial_query
-    );
+    info!("Received query: {:?}", initial_query);
     let client = client.lock().await;
 
     let dialect = PostgreSqlDialect {};
@@ -31,6 +27,8 @@ pub async fn handle_query(
     replace_measure_with_expression(&mut ast).await;
 
     let query = ast[0].to_string();
+
+    debug!("OLD Query : {}, NEW Query : {}", initial_query, query);
 
     if query.to_uppercase().starts_with("SELECT") {
         handle_select_query(&client, &query).await
@@ -62,9 +60,8 @@ async fn handle_select_query<'a>(client: &Client, query: &str) -> PgWireResult<V
 
 async fn handle_other_query<'a>(client: &Client, query: &str) -> PgWireResult<Vec<Response<'a>>> {
     if query.starts_with("UPDATE") || query.starts_with("WRITE") || query.starts_with("INSERT") {
-        println!(
-            "[{} WARNING] {} operation detected! ⚠️ This operation is not allowed.",
-            Local::now().format("%Y-%m-%d %H:%M:%S"),
+        warn!(
+            "{} operation detected! ⚠️ This operation is not allowed.",
             if query.starts_with("UPDATE") {
                 "UPDATE"
             } else {

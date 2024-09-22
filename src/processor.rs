@@ -10,7 +10,7 @@ use tokio::sync::Mutex;
 use tokio_postgres::{Client, NoTls};
 
 use crate::query_handler::handle_query;
-use crate::utils::config::DB_ADDRESS;
+use crate::utils::config::get_db_address;
 
 pub struct Processor {
     client: Arc<Mutex<Client>>,
@@ -29,7 +29,7 @@ impl SimpleQueryHandler for Processor {
 
 impl Processor {
     pub async fn new() -> Self {
-        let (client, connection) = tokio_postgres::connect(DB_ADDRESS, NoTls)
+        let (client, connection) = tokio_postgres::connect(&get_db_address(), NoTls)
             .await
             .expect("Failed to connect to database");
 
