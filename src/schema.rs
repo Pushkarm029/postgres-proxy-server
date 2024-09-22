@@ -53,7 +53,7 @@ async fn get_query_from_schema(old_arg: String) -> String {
     ))
     .fetch_one(&mut conn)
     .await
-    .unwrap();
+    .expect("Failed to get data from information_schema");
 
     new_arg.0
 }

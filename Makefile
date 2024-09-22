@@ -9,6 +9,21 @@ DB_PORT = 5432
 # setup-db
 # 
 
+# pub const SCHEMA_DB_ADDRESS: &str =
+#     "postgres://postgres:postgres@localhost:5432/information_schema";
+# pub const SCHEMA_TABLE_NAME: &str = "measures";
+# pub const DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432/main";
+# pub const SERVER_ADDR: &str = "127.0.0.1:5433";
+
+test: 	
+	@echo "Running tests..."
+	@DB_ADDRESS="postgres://postgres:postgres@localhost:5432/test_db" \
+	SCHEMA_DB_ADDRESS="postgres://postgres:postgres@localhost:5432/test_schema" \
+	SCHEMA_TABLE_NAME="measures" \
+	RUST_LOG=info \
+	RUST_BACKTRACE=1 \
+	$(CARGO) test
+
 setup-db:
 	@echo "Starting Postgres container..."
 	@docker run --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres
@@ -17,7 +32,7 @@ setup-db:
 
 .PHONY: all test setup teardown run-proxy populate-db run-tests clean
 
-test: setup create-db populate-db run-proxy run-tests
+# test: setup create-db populate-db run-proxy run-tests
 
 setup:
 	@echo "Starting Postgres container..."
