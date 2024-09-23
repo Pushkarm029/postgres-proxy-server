@@ -302,17 +302,17 @@ async fn e2e_test() {
         }
     });
 
-    // let res = client.query("SELECT * FROM employees;", &[]).await.unwrap();
-    // println!("{res:?}");
+    let res = client.query("SELECT * FROM employees;", &[]).await.unwrap();
+    println!("{res:?}");
 
-    let query_handler = tokio::spawn(async move{
-        let res = client.query("SELECT * FROM employees;", &[]).await.unwrap();
-        info!("{res:?}");
-    });
+    // let query_handler = tokio::spawn(async move{
+    //     let res = client.query("SELECT * FROM employees;", &[]).await.unwrap();
+    //     info!("{res:?}");
+    // });
 
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
-    query_handler.await.unwrap();
-    conn_handler.abort();
+    // query_handler.await.unwrap();
+    conn_handler.await.unwrap();
     server_handle.abort();
 }

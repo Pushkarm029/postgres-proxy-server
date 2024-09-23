@@ -15,6 +15,14 @@ test:
 	RUST_LOG=trace \
 	$(CARGO) test
 
+temp-test: 	
+	@echo "Running tests..."
+	@DB_ADDRESS="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)" \
+	SCHEMA_DB_ADDRESS="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(SCHEMA_DB_NAME)" \
+	SCHEMA_TABLE_NAME="measures" \
+	RUST_LOG=trace \
+	$(CARGO) test
+
 run: 	
 	@echo "Running in prod mode..."
 	@DB_ADDRESS="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)" \
@@ -61,4 +69,4 @@ clean:
 	@docker rm postgres
 	@rm -rf target
 
-.PHONY: run test setup teardown run-proxy populate-db populate-schema clean
+.PHONY: run test setup teardown run-proxy populate-db populate-schema clean temp-test
