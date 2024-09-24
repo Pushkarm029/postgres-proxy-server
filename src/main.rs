@@ -1,6 +1,8 @@
+use envconfig::Envconfig;
 use log::{error, info};
 use std::sync::Arc;
 use tokio::net::TcpListener;
+use utils::config::Config;
 
 mod processor;
 mod query_handler;
@@ -10,12 +12,12 @@ mod tests;
 mod utils;
 
 use crate::processor::ProcessorFactory;
-use crate::utils::config::get_server_binding_address;
 
 async fn run_tcp_server() {
     env_logger::init();
     let factory = Arc::new(ProcessorFactory::new().await);
-    let server_address = get_server_binding_address();
+    let config = Config::init_from_env().unwrap();
+    let server_address = config.server_address;
 
     info!("Starting server at {}", server_address);
 

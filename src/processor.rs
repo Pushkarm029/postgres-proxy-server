@@ -1,4 +1,6 @@
+use crate::{query_handler::handle_query, utils::config::Config};
 use async_trait::async_trait;
+use envconfig::Envconfig;
 use pgwire::api::{
     auth::noop::NoopStartupHandler,
     copy::NoopCopyHandler,
@@ -8,9 +10,6 @@ use pgwire::api::{
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio_postgres::{Client, NoTls};
-
-use crate::query_handler::handle_query;
-use crate::utils::config::get_db_address;
 
 pub struct Processor {
     client: Arc<Mutex<Client>>,
@@ -29,7 +28,8 @@ impl SimpleQueryHandler for Processor {
 
 impl Processor {
     pub async fn new() -> Self {
-        let (client, connection) = tokio_postgres::connect(&get_db_address(), NoTls)
+        let config = Config::init_from_env().unwrap();
+        let (client, connection) = tokio_postgres::connect(&config.db_address, NoTls)
             .await
             .expect("Failed to connect to database");
 

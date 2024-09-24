@@ -1,10 +1,10 @@
+use crate::utils::config::Config;
+use envconfig::Envconfig;
 use pgwire::error::PgWireError;
 use sqlparser::ast::{Expr, Function, FunctionArguments, Ident, ObjectName, SelectItem, Statement};
 use sqlparser::dialect::PostgreSqlDialect;
 use sqlparser::parser::Parser;
 use tokio_postgres::Client;
-
-use crate::utils::config::get_schema_table_name;
 
 pub async fn replace_measure_with_expression(client: &Client, initial_query: &str) -> String {
     let dialect = PostgreSqlDialect {};
@@ -45,9 +45,10 @@ pub async fn replace_measure_with_expression(client: &Client, initial_query: &st
 }
 
 async fn get_query_from_schema(client: &Client, old_arg: String) -> String {
+    let config = Config::init_from_env().unwrap();
     let query = format!(
         "SELECT query FROM {} WHERE name = $1;",
-        get_schema_table_name()
+        config.schema_table_name
     );
 
     let new_arg: String = client.query_one(&query, &[&old_arg]).await.unwrap().get(0);

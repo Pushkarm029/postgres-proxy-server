@@ -1,6 +1,7 @@
 use crate::schema::replace_measure_with_expression;
-use crate::utils::config::get_schema_db_address;
+use crate::utils::config::Config;
 use crate::utils::encoding::{encode_row_data, row_desc_from_stmt};
+use envconfig::Envconfig;
 use log::{debug, info, warn};
 use pgwire::api::{
     portal::Format,
@@ -17,8 +18,9 @@ pub async fn handle_query(
 ) -> PgWireResult<Vec<Response>> {
     info!("Received query: {:?}", initial_query);
     let client = client.lock().await;
+    let config = Config::init_from_env().unwrap();
     let (schema_client, schema_connection) =
-        tokio_postgres::connect(&get_schema_db_address(), NoTls)
+        tokio_postgres::connect(&config.schema_db_address, NoTls)
             .await
             .expect("Failed to connect to database");
 
