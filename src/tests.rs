@@ -1,101 +1,113 @@
-use std::thread;
-
 #[cfg(test)]
 use super::*;
 use schema::replace_measure_with_expression;
-use sqlx::{postgres::PgPoolOptions, query};
-use tokio::runtime::Builder;
 use tokio_postgres::NoTls;
 
-const DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432";
+// const DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432";
 const SCHEMA_DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432/information_schema";
-const TEST_DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432/test_db";
+// const TEST_DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432/test_db";
+// const PROXY_DB_ADDRESS: &str = "postgres://postgres:postgres@127.0.0.1:5433/main";
 
-// const PROXY_DB_ADDRESS: &str = "postgres://postgres:postgres@127.0.0.1:5433/test_db";
-
-const PROXY_DB_ADDRESS: &str = "postgres://postgres:postgres@127.0.0.1:5433/main";
-
-async fn init_db(pool: &sqlx::PgPool, name: &str) -> sqlx::Result<()> {
-    sqlx::query(format!("CREATE DATABASE {name}").as_str())
-        .execute(pool)
-        .await?;
-    Ok(())
-}
-
-async fn populate_schema_db(pool: &sqlx::PgPool) -> sqlx::Result<()> {
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS measures (
-                name TEXT PRIMARY KEY,
-                query TEXT NOT NULL
-            )",
-    )
-    .execute(pool)
-    .await?;
-
-    sqlx::query(
-        "INSERT INTO measures (name, query) VALUES ($1, $2), ($3, $4), ($5, $6)
-             ON CONFLICT (name) DO UPDATE SET query = EXCLUDED.query",
-    )
-    .bind("head_count")
-    .bind("COUNT(id)")
-    .bind("revenue")
-    .bind("SUM(amount)")
-    .bind("average_salary")
-    .bind("AVG(salary)")
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}
-
-async fn setup_main_db(pool: &sqlx::PgPool) -> sqlx::Result<()> {
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(50),
-                email VARCHAR(50),
-                salary NUMERIC,
-                amount NUMERIC
-            )",
-    )
-    .execute(pool)
-    .await?;
-
-    sqlx::query(
-        "INSERT INTO users (name, email, salary, amount) VALUES
-            ($1, $2, $3, $4), ($5, $6, $7, $8), ($9, $10, $11, $12)",
-    )
-    .bind("John Doe")
-    .bind("john.doe@example.com")
-    .bind(50000)
-    .bind(1000)
-    .bind("Jane Smith")
-    .bind("jane.smith@example.com")
-    .bind(60000)
-    .bind(1500)
-    .bind("Alice Johnson")
-    .bind("alice.johnson@example.com")
-    .bind(55000)
-    .bind(1200)
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}
-
-async fn cleanup() {
-    let schema_cleanup_pool = PgPoolOptions::new().connect(DB_ADDRESS).await.unwrap();
-    sqlx::query("DROP DATABASE test_schema WITH (FORCE);")
-        .execute(&schema_cleanup_pool)
+#[tokio::test]
+async fn test_query_modifier() {
+    let (client, connection) = tokio_postgres::connect(SCHEMA_DB_ADDRESS, NoTls)
         .await
         .unwrap();
 
-    let main_cleanup_pool = PgPoolOptions::new().connect(DB_ADDRESS).await.unwrap();
-    sqlx::query("DROP DATABASE test_db WITH (FORCE);")
-        .execute(&main_cleanup_pool)
-        .await
-        .unwrap();
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("Connection error: {}", e);
+        }
+    });
+
+    let initial_query: &str = "SELECT name, MEASURE(head_count) FROM employees GROUP BY name;";
+    let expected_final_query: &str = "SELECT name, COUNT(id) FROM employees GROUP BY name";
+    let final_query: String = replace_measure_with_expression(&client, initial_query).await;
+
+    assert_eq!(expected_final_query, final_query);
 }
+
+// async fn init_db(pool: &sqlx::PgPool, name: &str) -> sqlx::Result<()> {
+//     sqlx::query(format!("CREATE DATABASE {name}").as_str())
+//         .execute(pool)
+//         .await?;
+//     Ok(())
+// }
+
+// async fn populate_schema_db(pool: &sqlx::PgPool) -> sqlx::Result<()> {
+//     sqlx::query(
+//         "CREATE TABLE IF NOT EXISTS measures (
+//                 name TEXT PRIMARY KEY,
+//                 query TEXT NOT NULL
+//             )",
+//     )
+//     .execute(pool)
+//     .await?;
+
+//     sqlx::query(
+//         "INSERT INTO measures (name, query) VALUES ($1, $2), ($3, $4), ($5, $6)
+//              ON CONFLICT (name) DO UPDATE SET query = EXCLUDED.query",
+//     )
+//     .bind("head_count")
+//     .bind("COUNT(id)")
+//     .bind("revenue")
+//     .bind("SUM(amount)")
+//     .bind("average_salary")
+//     .bind("AVG(salary)")
+//     .execute(pool)
+//     .await?;
+
+//     Ok(())
+// }
+
+// async fn setup_main_db(pool: &sqlx::PgPool) -> sqlx::Result<()> {
+//     sqlx::query(
+//         "CREATE TABLE IF NOT EXISTS users (
+//                 id SERIAL PRIMARY KEY,
+//                 name VARCHAR(50),
+//                 email VARCHAR(50),
+//                 salary NUMERIC,
+//                 amount NUMERIC
+//             )",
+//     )
+//     .execute(pool)
+//     .await?;
+
+//     sqlx::query(
+//         "INSERT INTO users (name, email, salary, amount) VALUES
+//             ($1, $2, $3, $4), ($5, $6, $7, $8), ($9, $10, $11, $12)",
+//     )
+//     .bind("John Doe")
+//     .bind("john.doe@example.com")
+//     .bind(50000)
+//     .bind(1000)
+//     .bind("Jane Smith")
+//     .bind("jane.smith@example.com")
+//     .bind(60000)
+//     .bind(1500)
+//     .bind("Alice Johnson")
+//     .bind("alice.johnson@example.com")
+//     .bind(55000)
+//     .bind(1200)
+//     .execute(pool)
+//     .await?;
+
+//     Ok(())
+// }
+
+// async fn cleanup() {
+//     let schema_cleanup_pool = PgPoolOptions::new().connect(DB_ADDRESS).await.unwrap();
+//     sqlx::query("DROP DATABASE test_schema WITH (FORCE);")
+//         .execute(&schema_cleanup_pool)
+//         .await
+//         .unwrap();
+
+//     let main_cleanup_pool = PgPoolOptions::new().connect(DB_ADDRESS).await.unwrap();
+//     sqlx::query("DROP DATABASE test_db WITH (FORCE);")
+//         .execute(&main_cleanup_pool)
+//         .await
+//         .unwrap();
+// }
 
 // #[sqlx::test]
 
@@ -317,22 +329,3 @@ async fn cleanup() {
 //     conn_handler.await.unwrap();
 //     server_handle.abort();
 // }
-
-#[tokio::test]
-async fn test_query_modifier() {
-    let (client, connection) = tokio_postgres::connect(SCHEMA_DB_ADDRESS, NoTls)
-        .await
-        .unwrap();
-
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("Connection error: {}", e);
-        }
-    });
-
-    let initial_query: &str = "SELECT name, MEASURE(head_count) FROM employees GROUP BY name;";
-    let expected_final_query: &str = "SELECT name, COUNT(id) FROM employees GROUP BY name";
-    let final_query: String = replace_measure_with_expression(&client, initial_query).await;
-
-    assert_eq!(expected_final_query, final_query);
-}
