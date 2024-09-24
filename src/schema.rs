@@ -1,9 +1,17 @@
+use pgwire::error::PgWireError;
 use sqlparser::ast::{Expr, Function, FunctionArguments, Ident, ObjectName, SelectItem, Statement};
-use sqlx::{postgres::PgConnection, Connection};
+use sqlparser::dialect::PostgreSqlDialect;
+use sqlparser::parser::Parser;
+use tokio_postgres::Client;
 
-use crate::utils::config::{get_schema_db_address, get_schema_table_name};
+use crate::utils::config::get_schema_table_name;
 
-pub async fn replace_measure_with_expression(ast: &mut [Statement]) {
+pub async fn replace_measure_with_expression(client: &Client, initial_query: &str) -> String {
+    let dialect = PostgreSqlDialect {};
+    let mut ast = Parser::parse_sql(&dialect, initial_query)
+        .map_err(|e| PgWireError::ApiError(Box::new(e)))
+        .unwrap();
+
     for statement in ast.iter_mut() {
         if let Statement::Query(query) = statement {
             if let sqlparser::ast::SetExpr::Select(select) = query.body.as_mut() {
@@ -13,7 +21,8 @@ pub async fn replace_measure_with_expression(ast: &mut [Statement]) {
                             let mut new_item = String::new();
                             if let FunctionArguments::List(list) = &mut func.args {
                                 for item in list.args.iter_mut() {
-                                    new_item = get_query_from_schema(item.to_string()).await;
+                                    new_item =
+                                        get_query_from_schema(client, item.to_string()).await;
                                 }
                             }
                             *func = Function {
@@ -31,24 +40,16 @@ pub async fn replace_measure_with_expression(ast: &mut [Statement]) {
             }
         }
     }
+
+    ast[0].to_string()
 }
 
-#[derive(sqlx::FromRow, Debug, PartialEq, Eq)]
-struct SchemaQuery(String);
+async fn get_query_from_schema(client: &Client, old_arg: String) -> String {
+    let query = format!(
+        "SELECT query FROM {} WHERE name = $1;",
+        get_schema_table_name()
+    );
 
-async fn get_query_from_schema(old_arg: String) -> String {
-    let mut conn = PgConnection::connect(&get_schema_db_address())
-        .await
-        .expect("Failed to connect to database");
-
-    let new_arg: SchemaQuery = sqlx::query_as(&format!(
-        "SELECT query FROM {} WHERE name = '{}';",
-        get_schema_table_name(),
-        old_arg
-    ))
-    .fetch_one(&mut conn)
-    .await
-    .expect("Failed to get data from information_schema");
-
-    new_arg.0
+    let new_arg: String = client.query_one(&query, &[&old_arg]).await.unwrap().get(0);
+    new_arg
 }

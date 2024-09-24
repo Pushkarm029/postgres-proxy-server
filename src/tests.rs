@@ -2,12 +2,13 @@ use std::thread;
 
 #[cfg(test)]
 use super::*;
+use schema::replace_measure_with_expression;
 use sqlx::{postgres::PgPoolOptions, query};
 use tokio::runtime::Builder;
 use tokio_postgres::NoTls;
 
 const DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432";
-const SCHEMA_DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432/test_schema";
+const SCHEMA_DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432/information_schema";
 const TEST_DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432/test_db";
 
 // const PROXY_DB_ADDRESS: &str = "postgres://postgres:postgres@127.0.0.1:5433/test_db";
@@ -272,47 +273,66 @@ async fn cleanup() {
 //     info!("{:?}", sss);
 // }
 
-async fn start_server() {
-    // Spawn the main function
-    let _main_handle = tokio::spawn(async {
-        run_tcp_server().await;
-    });
+// async fn start_server() {
+//     // Spawn the main function
+//     let _main_handle = tokio::spawn(async {
+//         run_tcp_server().await;
+//     });
 
-    // Wait a bit for the server to start
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-}
+//     // Wait a bit for the server to start
+//     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+// }
+
+// #[tokio::test]
+// async fn e2e_test() {
+//     let server_handle = tokio::spawn(async {
+//         run_tcp_server().await;
+//     });
+
+//     // Add a delay to ensure the server is fully up and running before connecting
+//     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+//     // Connect to the PostgreSQL server
+//     let (client, connection) = tokio_postgres::connect(PROXY_DB_ADDRESS, NoTls)
+//         .await
+//         .expect("Failed to connect to the database");
+
+//     let conn_handler = tokio::spawn(async move {
+//         if let Err(e) = connection.await {
+//             eprintln!("Connection error: {}", e);
+//         }
+//     });
+
+//     let res = client.query("SELECT * FROM employees;", &[]).await.unwrap();
+//     println!("{res:?}");
+
+//     // let query_handler = tokio::spawn(async move{
+//     //     let res = client.query("SELECT * FROM employees;", &[]).await.unwrap();
+//     //     info!("{res:?}");
+//     // });
+
+//     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+//     // query_handler.await.unwrap();
+//     conn_handler.await.unwrap();
+//     server_handle.abort();
+// }
 
 #[tokio::test]
-async fn e2e_test() {
-    let server_handle = tokio::spawn(async {
-        run_tcp_server().await;
-    });
-
-    // Add a delay to ensure the server is fully up and running before connecting
-    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
-    // Connect to the PostgreSQL server
-    let (client, connection) = tokio_postgres::connect(PROXY_DB_ADDRESS, NoTls)
+async fn test_query_modifier() {
+    let (client, connection) = tokio_postgres::connect(SCHEMA_DB_ADDRESS, NoTls)
         .await
-        .expect("Failed to connect to the database");
+        .unwrap();
 
-    let conn_handler = tokio::spawn(async move {
+    tokio::spawn(async move {
         if let Err(e) = connection.await {
             eprintln!("Connection error: {}", e);
         }
     });
 
-    let res = client.query("SELECT * FROM employees;", &[]).await.unwrap();
-    println!("{res:?}");
+    let initial_query: &str = "SELECT name, MEASURE(head_count) FROM employees GROUP BY name;";
+    let expected_final_query: &str = "SELECT name, COUNT(id) FROM employees GROUP BY name";
+    let final_query: String = replace_measure_with_expression(&client, initial_query).await;
 
-    // let query_handler = tokio::spawn(async move{
-    //     let res = client.query("SELECT * FROM employees;", &[]).await.unwrap();
-    //     info!("{res:?}");
-    // });
-
-    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
-    // query_handler.await.unwrap();
-    conn_handler.await.unwrap();
-    server_handle.abort();
+    assert_eq!(expected_final_query, final_query);
 }

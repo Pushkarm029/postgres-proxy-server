@@ -22,6 +22,12 @@
    psql postgres://postgres:postgres@127.0.0.1:5433/main
    ```
 
+## Testing
+   **Currently**, you have to populate db following above steps to run tests successfully.
+   ```bash
+   make test
+   ```
+
 ## Example Queries
 
 - **Check Postgres Version:**

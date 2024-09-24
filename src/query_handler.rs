@@ -1,17 +1,15 @@
+use crate::schema::replace_measure_with_expression;
+use crate::utils::config::get_schema_db_address;
+use crate::utils::encoding::{encode_row_data, row_desc_from_stmt};
 use log::{debug, info, warn};
 use pgwire::api::{
     portal::Format,
     results::{QueryResponse, Response, Tag},
 };
 use pgwire::error::{PgWireError, PgWireResult};
-use sqlparser::dialect::PostgreSqlDialect;
-use sqlparser::parser::Parser;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tokio_postgres::Client;
-
-use crate::schema::replace_measure_with_expression;
-use crate::utils::encoding::{encode_row_data, row_desc_from_stmt};
+use tokio_postgres::{Client, NoTls};
 
 pub async fn handle_query(
     client: Arc<Mutex<Client>>,
@@ -19,14 +17,18 @@ pub async fn handle_query(
 ) -> PgWireResult<Vec<Response>> {
     info!("Received query: {:?}", initial_query);
     let client = client.lock().await;
+    let (schema_client, schema_connection) =
+        tokio_postgres::connect(&get_schema_db_address(), NoTls)
+            .await
+            .expect("Failed to connect to database");
 
-    let dialect = PostgreSqlDialect {};
-    let mut ast = Parser::parse_sql(&dialect, initial_query)
-        .map_err(|e| PgWireError::ApiError(Box::new(e)))?;
+    tokio::spawn(async move {
+        if let Err(e) = schema_connection.await {
+            eprintln!("schema connection error: {}", e);
+        }
+    });
 
-    replace_measure_with_expression(&mut ast).await;
-
-    let query = ast[0].to_string();
+    let query = replace_measure_with_expression(&schema_client, initial_query).await;
 
     debug!("OLD Query : {}, NEW Query : {}", initial_query, query);
 
