@@ -17,8 +17,10 @@ pub async fn handle_query(
     initial_query: &str,
 ) -> PgWireResult<Vec<Response>> {
     info!("Received query: {:?}", initial_query);
+
     let client = client.lock().await;
     let config = Config::init_from_env().unwrap();
+
     let (schema_client, schema_connection) =
         tokio_postgres::connect(&config.schema_db_address, NoTls)
             .await
@@ -30,14 +32,17 @@ pub async fn handle_query(
         }
     });
 
-    let query = replace_measure_with_expression(&schema_client, initial_query).await;
+    let prepared_query = replace_measure_with_expression(&schema_client, initial_query).await;
 
-    debug!("OLD Query : {}, NEW Query : {}", initial_query, query);
+    debug!(
+        "OLD Query : {}, NEW Query : {}",
+        initial_query, prepared_query
+    );
 
-    if query.to_uppercase().starts_with("SELECT") {
-        handle_select_query(&client, &query).await
+    if prepared_query.to_uppercase().starts_with("SELECT") {
+        handle_select_query(&client, &prepared_query).await
     } else {
-        handle_other_query(&client, &query).await
+        handle_other_query(&client, &prepared_query).await
     }
 }
 

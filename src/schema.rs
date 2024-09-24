@@ -41,6 +41,7 @@ pub async fn replace_measure_with_expression(client: &Client, initial_query: &st
         }
     }
 
+    // Final Query
     ast[0].to_string()
 }
 

@@ -12,17 +12,17 @@ use tokio::sync::Mutex;
 use tokio_postgres::{Client, NoTls};
 
 pub struct Processor {
-    client: Arc<Mutex<Client>>,
+    user_client: Arc<Mutex<Client>>,
 }
 
 #[async_trait]
 impl SimpleQueryHandler for Processor {
     async fn do_query<'a, C>(
         &self,
-        _client: &mut C,
+        _db_client: &mut C,
         query: &'a str,
     ) -> pgwire::error::PgWireResult<Vec<pgwire::api::results::Response<'a>>> {
-        handle_query(self.client.clone(), query).await
+        handle_query(self.user_client.clone(), query).await
     }
 }
 
@@ -40,7 +40,7 @@ impl Processor {
         });
 
         Self {
-            client: Arc::new(Mutex::new(client)),
+            user_client: Arc::new(Mutex::new(client)),
         }
     }
 }

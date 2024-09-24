@@ -34,6 +34,7 @@ async fn run_tcp_server() {
         match listener.accept().await {
             Ok((tcp_stream, addr)) => {
                 info!("New connection accepted from: {}", addr);
+
                 let factory_ref = factory.clone();
                 tokio::spawn(async move {
                     pgwire::tokio::process_socket(tcp_stream, None, factory_ref).await
