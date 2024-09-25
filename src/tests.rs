@@ -10,7 +10,7 @@ const SCHEMA_DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432/inf
 
 #[tokio::test]
 async fn test_query_modifier() {
-    let (client, connection) = tokio_postgres::connect(SCHEMA_DB_ADDRESS, NoTls)
+    let (schema_client, connection) = tokio_postgres::connect(SCHEMA_DB_ADDRESS, NoTls)
         .await
         .unwrap();
 
@@ -22,7 +22,7 @@ async fn test_query_modifier() {
 
     let initial_query: &str = "SELECT name, MEASURE(head_count) FROM employees GROUP BY name;";
     let expected_final_query: &str = "SELECT name, COUNT(id) FROM employees GROUP BY name";
-    let final_query: String = replace_measure_with_expression(&client, initial_query).await;
+    let final_query: String = replace_measure_with_expression(&schema_client, initial_query).await;
 
     assert_eq!(expected_final_query, final_query);
 }

@@ -6,7 +6,10 @@ use sqlparser::dialect::PostgreSqlDialect;
 use sqlparser::parser::Parser;
 use tokio_postgres::Client;
 
-pub async fn replace_measure_with_expression(client: &Client, initial_query: &str) -> String {
+pub async fn replace_measure_with_expression(
+    schema_client: &Client,
+    initial_query: &str,
+) -> String {
     let dialect = PostgreSqlDialect {};
     let mut ast = Parser::parse_sql(&dialect, initial_query)
         .map_err(|e| PgWireError::ApiError(Box::new(e)))
@@ -22,7 +25,8 @@ pub async fn replace_measure_with_expression(client: &Client, initial_query: &st
                             if let FunctionArguments::List(list) = &mut func.args {
                                 for item in list.args.iter_mut() {
                                     new_item =
-                                        get_query_from_schema(client, item.to_string()).await;
+                                        get_query_from_schema(schema_client, item.to_string())
+                                            .await;
                                 }
                             }
                             *func = Function {
@@ -45,13 +49,17 @@ pub async fn replace_measure_with_expression(client: &Client, initial_query: &st
     ast[0].to_string()
 }
 
-async fn get_query_from_schema(client: &Client, old_arg: String) -> String {
+async fn get_query_from_schema(schema_client: &Client, old_arg: String) -> String {
     let config = Config::init_from_env().unwrap();
     let query = format!(
         "SELECT query FROM {} WHERE name = $1;",
         config.schema_table_name
     );
 
-    let new_arg: String = client.query_one(&query, &[&old_arg]).await.unwrap().get(0);
+    let new_arg: String = schema_client
+        .query_one(&query, &[&old_arg])
+        .await
+        .unwrap()
+        .get(0);
     new_arg
 }
