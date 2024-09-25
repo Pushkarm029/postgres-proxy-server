@@ -6,11 +6,12 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1.82"
 bytes = "1.7.1"
-chrono = "0.4.38"
+env_logger = "0.11.5"
+envconfig = "0.11.0"
 futures = "0.3.30"
+log = "0.4.22"
 pgwire = "0.24.1"
+rust_decimal = "1.36.0"
 sqlparser = "0.51.0"
-# tokio (no TLS)
-sqlx = { version = "0.8", features = [ "runtime-tokio", "postgres" ] }
 tokio = { version = "1.40.0", features = ["full"] }
 tokio-postgres = "0.7.11"
