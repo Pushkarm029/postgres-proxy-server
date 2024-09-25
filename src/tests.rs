@@ -3,14 +3,14 @@ use super::*;
 use schema::replace_measure_with_expression;
 use tokio_postgres::NoTls;
 
-// const DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432";
-const SCHEMA_DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432/information_schema";
+// const DATA_DB_CONN_STRING: &str = "postgres://postgres:postgres@localhost:5432";
+const SCHEMA_DB_CONN_STRING: &str = "postgres://postgres:postgres@localhost:5432/information_schema";
 // const TEST_DB_ADDRESS: &str = "postgres://postgres:postgres@localhost:5432/test_db";
 // const PROXY_DB_ADDRESS: &str = "postgres://postgres:postgres@127.0.0.1:5433/main";
 
 #[tokio::test]
 async fn test_query_modifier() {
-    let (schema_client, connection) = tokio_postgres::connect(SCHEMA_DB_ADDRESS, NoTls)
+    let (schema_client, connection) = tokio_postgres::connect(SCHEMA_DB_CONN_STRING, NoTls)
         .await
         .unwrap();
 

@@ -9,32 +9,32 @@ DB_PORT = 5432
 
 test: 	
 	@echo "Running tests..."
-	@DB_ADDRESS="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/test_db" \
-	SCHEMA_DB_ADDRESS="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/test_schema" \
+	@DATA_DB_CONN_STRING="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/test_db" \
+	SCHEMA_DB_CONN_STRING="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/test_schema" \
 	SCHEMA_TABLE_NAME="measures" \
 	RUST_LOG=trace \
 	$(CARGO) test
 
 temp-test: 	
 	@echo "Running tests..."
-	@DB_ADDRESS="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)" \
-	SCHEMA_DB_ADDRESS="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(SCHEMA_DB_NAME)" \
+	@DATA_DB_CONN_STRING="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)" \
+	SCHEMA_DB_CONN_STRING="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(SCHEMA_DB_NAME)" \
 	SCHEMA_TABLE_NAME="measures" \
 	RUST_LOG=trace \
 	$(CARGO) test
 
 run: 	
 	@echo "Running in prod mode..."
-	@DB_ADDRESS="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)" \
-	SCHEMA_DB_ADDRESS="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(SCHEMA_DB_NAME)" \
+	@DATA_DB_CONN_STRING="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)" \
+	SCHEMA_DB_CONN_STRING="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(SCHEMA_DB_NAME)" \
 	SCHEMA_TABLE_NAME="measures" \
 	RUST_LOG=info \
 	$(CARGO) run
 
 debug-run: 	
 	@echo "Running in debug mode..."
-	@DB_ADDRESS="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/test_db" \
-	SCHEMA_DB_ADDRESS="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/test_schema" \
+	@DATA_DB_CONN_STRING="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/test_db" \
+	SCHEMA_DB_CONN_STRING="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/test_schema" \
 	SCHEMA_TABLE_NAME="measures" \
 	RUST_LOG=info \
 	$(CARGO) run

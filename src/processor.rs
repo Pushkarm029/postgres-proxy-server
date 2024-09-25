@@ -29,7 +29,7 @@ impl SimpleQueryHandler for Processor {
 impl Processor {
     pub async fn new() -> Self {
         let config = Config::init_from_env().unwrap();
-        let (client, connection) = tokio_postgres::connect(&config.db_address, NoTls)
+        let (client, connection) = tokio_postgres::connect(&config.data_db_conn, NoTls)
             .await
             .expect("Failed to connect to database");
 

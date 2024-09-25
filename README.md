@@ -49,11 +49,11 @@
 
 ## Environment Variables
 
-- **SCHEMA_DB_ADDRESS**: Address of the schema database (`information_schema`).
+- **SCHEMA_DB_CONN_STRING**: Address of the schema database (`information_schema`).
   
   Default: `postgres://postgres:postgres@localhost:5432/information_schema`
 
-- **DB_ADDRESS**: Address of the main database (`main`).
+- **DATA_DB_CONN_STRING**: Address of the main database (`main`).
   
   Default: `postgres://postgres:postgres@localhost:5432/main`
 

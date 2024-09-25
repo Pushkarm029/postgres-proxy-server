@@ -22,7 +22,7 @@ pub async fn handle_query(
     let config = Config::init_from_env().unwrap();
 
     let (schema_client, schema_connection) =
-        tokio_postgres::connect(&config.schema_db_address, NoTls)
+        tokio_postgres::connect(&config.schema_db_conn, NoTls)
             .await
             .expect("Failed to connect to database");
 
