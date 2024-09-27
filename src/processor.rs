@@ -1,46 +1,41 @@
-use crate::{query_handler::handle_query, utils::config::Config};
+use crate::data_store::DataStore;
+use crate::query_handler::QueryHandler;
+use crate::semantic_model::SemanticModelStore;
 use async_trait::async_trait;
-use envconfig::Envconfig;
+use pgwire::api::results::Response;
 use pgwire::api::{
     auth::noop::NoopStartupHandler,
     copy::NoopCopyHandler,
     query::{PlaceholderExtendedQueryHandler, SimpleQueryHandler},
     PgWireHandlerFactory,
 };
+use pgwire::error::PgWireResult;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tokio_postgres::{Client, NoTls};
 
 pub struct Processor {
-    user_client: Arc<Mutex<Client>>,
+    query_handler: Arc<Mutex<Box<QueryHandler>>>,
 }
 
 #[async_trait]
 impl SimpleQueryHandler for Processor {
     async fn do_query<'a, C>(
         &self,
-        _db_client: &mut C,
+        _client: &mut C,
         query: &'a str,
-    ) -> pgwire::error::PgWireResult<Vec<pgwire::api::results::Response<'a>>> {
-        handle_query(self.user_client.clone(), query).await
+    ) -> PgWireResult<Vec<Response<'a>>> {
+        let query_handler = self.query_handler.lock().await;
+        query_handler.handle(query).map_err(|e| e.into())
     }
 }
 
-impl Processor {
-    pub async fn new() -> Self {
-        let config = Config::init_from_env().unwrap();
-        let (client, connection) = tokio_postgres::connect(&config.data_db_conn, NoTls)
-            .await
-            .expect("Failed to connect to database");
-
-        tokio::spawn(async move {
-            if let Err(e) = connection.await {
-                eprintln!("connection error: {}", e);
-            }
-        });
-
+impl Processor{
+    pub async fn new(
+        data_store: &dyn DataStore,
+        semantic_model: &dyn SemanticModelStore,
+    ) -> Self {
         Self {
-            user_client: Arc::new(Mutex::new(client)),
+            query_handler: Arc::new(Mutex::new(QueryHandler::new(data_store, semantic_model))),
         }
     }
 }
@@ -50,14 +45,17 @@ pub struct ProcessorFactory {
 }
 
 impl ProcessorFactory {
-    pub async fn new() -> Self {
+    pub async fn new(
+        data_store: &dyn DataStore,
+        semantic_model: &dyn SemanticModelStore,
+    ) -> Self {
         Self {
-            handler: Arc::new(Processor::new().await),
+            handler: Arc::new(Processor::new(data_store, semantic_model).await),
         }
     }
 }
 
-impl PgWireHandlerFactory for ProcessorFactory {
+impl<'a> PgWireHandlerFactory for ProcessorFactory {
     type StartupHandler = NoopStartupHandler;
     type SimpleQueryHandler = Processor;
     type ExtendedQueryHandler = PlaceholderExtendedQueryHandler;
