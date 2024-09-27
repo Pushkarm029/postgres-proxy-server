@@ -21,13 +21,17 @@ pub enum SqlParserError {
     MeasureFunctionError(String),
 }
 
-pub struct SqlParser<'a> {
-    data_store: &'a dyn DataStore,
-    semantic_model: &'a dyn SemanticModelStore,
+pub struct SqlParser<D, S> {
+    data_store: D,
+    semantic_model: S,
 }
 
-impl<'a> SqlParser<'a> {
-    pub fn new(data_store: &'a dyn DataStore, semantic_model: &'a dyn SemanticModelStore) -> Self {
+impl<D, S> SqlParser<D, S>
+where
+    D: DataStore,
+    S: SemanticModelStore,
+{
+    pub fn new(data_store: D, semantic_model: S) -> Self {
         SqlParser {
             data_store,
             semantic_model,
@@ -59,8 +63,8 @@ impl<'a> SqlParser<'a> {
                 Statement::Query(mut query) => {
                     transformations::apply_transformations(
                         &mut query,
-                        &*self.data_store,
-                        &*self.semantic_model,
+                        &self.data_store,
+                        &self.semantic_model,
                     )?;
                     Ok(Statement::Query(query))
                 }

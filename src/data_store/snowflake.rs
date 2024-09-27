@@ -1,6 +1,8 @@
 use crate::data_store::{DataStore, DataStoreError, PostgresType, Row};
-use odbc::{odbc_safe::AutocommitOn, Connection, Environment};
+use odbc::{odbc_safe::AutocommitOn, safe::Odbc3, Connection, Environment};
+use pgwire::messages::data::DataRow;
 
+#[derive(Clone)]
 pub struct SnowflakeConfig {
     pub account: String,
     pub user: String,
@@ -10,24 +12,34 @@ pub struct SnowflakeConfig {
     pub schema: String,
 }
 
-pub struct SnowflakeDataStore<'env> {
+pub struct SnowflakeDataStore<'a> {
     config: SnowflakeConfig,
-    conn: Connection<'env, AutocommitOn>,
+    env: Environment<Odbc3>,
+    conn: Connection<'a, AutocommitOn>,
 }
 
-impl<'env> SnowflakeDataStore<'env> {
+impl<'a> Clone for SnowflakeDataStore<'a> {
+    fn clone(&self) -> Self {
+        todo!("Make the data store/connection cloneable")
+    }
+}
+
+impl<'a> SnowflakeDataStore<'a> {
     pub fn new(config: SnowflakeConfig) -> Result<Self, DataStoreError> {
         let connection_string = format!(
             "Driver={{SnowflakeDSIIDriver}};Server={}.snowflakecomputing.com;Uid={};Pwd={};Warehouse={};Database={};Schema={};",
             config.account, config.user, config.password, config.warehouse, config.database, config.schema
         );
 
-        let env = Environment::new().map_err(|e| DataStoreError::ConnectionError(e.to_string()))?;
+        let env = Environment::new().map_err(|e| match e {
+            Some(e) => DataStoreError::ConnectionError(e.to_string()),
+            None => DataStoreError::ConnectionError("TODO: something here".to_string()),
+        })?;
         let conn = env
             .connect_with_connection_string(&connection_string)
             .map_err(|e| DataStoreError::ConnectionError(e.to_string()))?;
 
-        Ok(Self { config, conn })
+        todo!("figure out how to store environment so that it can outlive connections")
     }
 }
 
@@ -95,22 +107,7 @@ impl<'env> DataStore for SnowflakeDataStore<'env> {
         }
     }
 
-    fn execute(&self, query: &str) -> Result<Vec<Row>, DataStoreError> {
-        let mut stmt = self
-            .conn
-            .prepare(query)
-            .map_err(|e| DataStoreError::QueryError(e.to_string()))?;
-        let rows = stmt
-            .query()
-            .map_err(|e| DataStoreError::QueryError(e.to_string()))?;
-        let mut result = Vec::new();
-
-        for row in rows {
-            let row_data: Vec<String> = row.iter().map(|cell| cell.to_string()).collect();
-            result.push(Row {
-                columns: row_data,
-                values: Vec::new(),
-            });
-        }
+    fn execute(&self, query: &str) -> Result<Vec<DataRow>, DataStoreError> {
+        todo!()
     }
 }

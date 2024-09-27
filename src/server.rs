@@ -1,5 +1,5 @@
 use crate::data_store::{SnowflakeConfig, SnowflakeDataStore};
-use crate::processor::{ProcessorFactory};
+use crate::processor::ProcessorFactory;
 use crate::semantic_model::S3SemanticModelStore;
 use envconfig::Envconfig;
 use log::{error, info};
@@ -38,24 +38,26 @@ async fn run_tcp_server() {
 
     let temp_tenant_id_for_testing = "tenant1";
     let config = Config::init_from_env().unwrap();
-    let semantic_model =
-        S3SemanticModelStore::new(temp_tenant_id_for_testing.to_string(), config.s3_bucket_name);
+    // let semantic_model = S3SemanticModelStore::new(
+    //     temp_tenant_id_for_testing.to_string(),
+    //     config.s3_bucket_name,
+    // );
 
-    let semantic_model = semantic_model.await;
-    let snowflake_config = SnowflakeConfig {
-        account: config.snowflake_account.clone(),
-        user: config.snowflake_user.clone(),
-        password: config.snowflake_password.clone(),
-        warehouse: config.snowflake_warehouse.clone(),
-        database: config.snowflake_database.clone(),
-        schema: temp_tenant_id_for_testing.to_string(),
-    };
-    let data_store = SnowflakeDataStore::new(snowflake_config).unwrap_or_else(|err| {
-        error!("Failed to create Snowflake dialect: {}", err);
-        std::process::exit(1);
-    });
+    // let semantic_model = semantic_model.await;
+    // let snowflake_config = SnowflakeConfig {
+    //     account: config.snowflake_account.clone(),
+    //     user: config.snowflake_user.clone(),
+    //     password: config.snowflake_password.clone(),
+    //     warehouse: config.snowflake_warehouse.clone(),
+    //     database: config.snowflake_database.clone(),
+    //     schema: temp_tenant_id_for_testing.to_string(),
+    // };
+    // let data_store = SnowflakeDataStore::new(snowflake_config).unwrap_or_else(|err| {
+    //     error!("Failed to create Snowflake dialect: {}", err);
+    //     std::process::exit(1);
+    // });
 
-    let factory = Arc::new(ProcessorFactory::new(&data_store, &semantic_model));
+    let factory = Arc::new(ProcessorFactory::new().await);
     let server_address = format!("{}:{}", config.server_host, config.server_port);
 
     info!("Starting server at {}", server_address);

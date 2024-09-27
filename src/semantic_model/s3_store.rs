@@ -1,10 +1,11 @@
-use crate::semantic_model::model::{Measure, SemanticModel};
 use crate::semantic_model::store::{SemanticModelStore, SemanticModelStoreError};
+use crate::semantic_model::{Measure, SemanticModel};
 use aws_sdk_s3::{config::BehaviorVersion, Client};
 use std::collections::HashMap;
 use std::error::Error;
 use tokio::runtime::Runtime;
 
+#[derive(Clone)]
 pub struct S3SemanticModelStore {
     tenant: String,
     s3_client: Client,
@@ -60,31 +61,32 @@ impl S3SemanticModelStore {
 }
 
 impl SemanticModelStore for S3SemanticModelStore {
-    fn get_semantic_model(&self, name: &str) -> Result<Option<SemanticModel>, Box<dyn Error>> {
-        let rt = Runtime::new()?;
+    fn get_semantic_model(&self, name: &str) -> Result<SemanticModel, SemanticModelStoreError> {
+        let rt = Runtime::new().unwrap();
         rt.block_on(async {
             let key = format!("{}.json", name);
-            let content = self.get_object_content(&key).await?;
+            let content = self.get_object_content(&key).await.unwrap();
             match content {
                 Some(json) => {
-                    let semantic_model = serde_json::from_str(&json)?;
-                    Ok(Some(semantic_model))
+                    let semantic_model = serde_json::from_str(&json).unwrap();
+                    Ok(semantic_model)
                 }
-                None => Ok(None),
+                None => Err(SemanticModelStoreError::MeasureNotFound),
             }
         })
     }
 
-    fn get_all_semantic_models(&self) -> Result<HashMap<String, SemanticModel>, Box<dyn Error>> {
-        let rt = Runtime::new()?;
+    fn get_all_semantic_models(
+        &self,
+    ) -> Result<HashMap<String, SemanticModel>, SemanticModelStoreError> {
+        let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let keys = self.list_objects().await?;
+            let keys = self.list_objects().await.unwrap();
             let mut semantic_models = HashMap::new();
             for key in keys {
                 if let Some(name) = key.strip_suffix(".json") {
-                    if let Some(semantic_model) = self.get_semantic_model(name)? {
-                        semantic_models.insert(name.to_string(), semantic_model);
-                    }
+                    let semantic_model = self.get_semantic_model(name)?;
+                    semantic_models.insert(name.to_string(), semantic_model);
                 }
             }
             Ok(semantic_models)
@@ -95,20 +97,18 @@ impl SemanticModelStore for S3SemanticModelStore {
         &self,
         table_name: &str,
         measure_name: &str,
-    ) -> Result<Option<Measure>, Box<dyn Error>> {
+    ) -> Result<Measure, SemanticModelStoreError> {
         let semantic_model = self.get_semantic_model(table_name)?;
-        if let Some(semantic_model) = semantic_model {
-            // Lookup the measure in the semantic model measures vector
-            let measure = semantic_model
-                .measures
-                .iter()
-                .find(|m| m.name == measure_name);
+        // Lookup the measure in the semantic model measures vector
+        let measure = semantic_model
+            .measures
+            .iter()
+            .find(|m| m.name == measure_name);
 
-            if let Some(measure) = measure {
-                return Ok(Some(measure.clone()));
-            }
+        if let Some(measure) = measure {
+            Ok(measure.clone())
+        } else {
+            Err(SemanticModelStoreError::MeasureNotFound)
         }
-
-        Err(Box::new(SemanticModelStoreError::MeasureNotFound))
     }
 }

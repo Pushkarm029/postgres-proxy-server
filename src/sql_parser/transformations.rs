@@ -4,11 +4,15 @@ use crate::sql_parser::SqlParserError;
 use sqlparser::ast::*;
 use sqlparser::parser::Parser;
 
-pub fn apply_transformations<'a>(
-    query: &'a mut Query,
-    data_store: &'a dyn DataStore,
-    semantic_model: &'a dyn SemanticModelStore,
-) -> Result<(), SqlParserError> {
+pub fn apply_transformations<D, S>(
+    query: &mut Query,
+    data_store: &D,
+    semantic_model: &S,
+) -> Result<(), SqlParserError>
+where
+    D: DataStore,
+    S: SemanticModelStore,
+{
     // First apply the transformations for the body, then each cte recursively
     apply_set_expression(&mut query.body, data_store, semantic_model)?;
 
@@ -21,11 +25,15 @@ pub fn apply_transformations<'a>(
     Ok(())
 }
 
-fn apply_set_expression<'a>(
-    set_expr: &'a mut SetExpr,
-    data_store: &'a dyn DataStore,
-    semantic_model: &'a dyn SemanticModelStore,
-) -> Result<(), SqlParserError> {
+fn apply_set_expression<D, S>(
+    set_expr: &mut SetExpr,
+    data_store: &D,
+    semantic_model: &S,
+) -> Result<(), SqlParserError>
+where
+    D: DataStore,
+    S: SemanticModelStore,
+{
     match set_expr {
         SetExpr::Select(select) => {
             for projection in &mut select.projection {
@@ -62,11 +70,15 @@ fn apply_set_expression<'a>(
     Ok(())
 }
 
-fn rewrite_expression<'a>(
-    expr: &'a mut Expr,
-    data_store: &'a dyn DataStore,
-    semantic_model: &'a dyn SemanticModelStore,
-) -> Result<(), SqlParserError> {
+fn rewrite_expression<D, S>(
+    expr: &mut Expr,
+    data_store: &D,
+    semantic_model: &S,
+) -> Result<(), SqlParserError>
+where
+    D: DataStore,
+    S: SemanticModelStore,
+{
     *expr = match std::mem::replace(expr, Expr::Value(Value::Null)) {
         Expr::Function(mut func) => {
             if func.name.to_string().to_uppercase() == "MEASURE" {
@@ -114,11 +126,15 @@ fn rewrite_expression<'a>(
 ///
 /// The function transforms the `MEASURE` call to the SQL defined for the measure in the semantic
 /// model.
-fn rewrite_measure<'a>(
-    func: &'a mut Function,
-    data_store: &'a dyn DataStore,
-    semantic_model: &'a dyn SemanticModelStore,
-) -> Result<Expr, SqlParserError> {
+fn rewrite_measure<D, S>(
+    func: &mut Function,
+    data_store: &D,
+    semantic_model: &S,
+) -> Result<Expr, SqlParserError>
+where
+    D: DataStore,
+    S: SemanticModelStore,
+{
     let args = match &func.args {
         FunctionArguments::List(args) => args,
         _ => {
@@ -156,36 +172,30 @@ fn rewrite_measure<'a>(
         .get_measure(table_name, measure_name)
         .map_err(|e| SqlParserError::MeasureFunctionError(e.to_string()))?;
 
-    if let Some(measure) = measure {
-        let dialect = data_store.get_dialect();
-        let statement_sql = format!("SELECT {}", measure.sql);
-        let statements = Parser::parse_sql(dialect, &statement_sql)
-            .map_err(|e| SqlParserError::MeasureFunctionError(e.to_string()))?;
+    let dialect = data_store.get_dialect();
+    let statement_sql = format!("SELECT {}", measure.sql);
+    let statements = Parser::parse_sql(dialect, &statement_sql)
+        .map_err(|e| SqlParserError::MeasureFunctionError(e.to_string()))?;
 
-        let expr = match statements.get(0).unwrap() {
-            Statement::Query(query) => {
-                match query.body.as_select().unwrap().projection.get(0).unwrap() {
-                    SelectItem::UnnamedExpr(Expr::Function(new_func)) => {
-                        Expr::Function(new_func.clone())
-                    }
-                    _ => {
-                        return Err(SqlParserError::MeasureFunctionError(
-                            "MEASURE function expects a single function expression".to_string(),
-                        ))
-                    }
+    let expr = match statements.get(0).unwrap() {
+        Statement::Query(query) => {
+            match query.body.as_select().unwrap().projection.get(0).unwrap() {
+                SelectItem::UnnamedExpr(Expr::Function(new_func)) => {
+                    Expr::Function(new_func.clone())
+                }
+                _ => {
+                    return Err(SqlParserError::MeasureFunctionError(
+                        "MEASURE function expects a single function expression".to_string(),
+                    ))
                 }
             }
-            _ => {
-                return Err(SqlParserError::MeasureFunctionError(
-                    "MEASURE function expects a single function expression".to_string(),
-                ))
-            }
-        };
+        }
+        _ => {
+            return Err(SqlParserError::MeasureFunctionError(
+                "MEASURE function expects a single function expression".to_string(),
+            ))
+        }
+    };
 
-        Ok(expr)
-    } else {
-        Err(SqlParserError::MeasureFunctionError(
-            "MEASURE function expects a single function expression".to_string(),
-        ))
-    }
+    Ok(expr)
 }

@@ -1,5 +1,6 @@
-use crate::data_store::DataStore;
+use crate::data_store::{DataStore, TodoDummyDataStore};
 use crate::query_handler::QueryHandler;
+use crate::semantic_model::local_store::LocalSemanticModelStore;
 use crate::semantic_model::SemanticModelStore;
 use async_trait::async_trait;
 use pgwire::api::results::Response;
@@ -14,7 +15,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 pub struct Processor {
-    query_handler: Arc<Mutex<Box<QueryHandler>>>,
+    query_handler: Arc<Mutex<QueryHandler<TodoDummyDataStore, LocalSemanticModelStore>>>,
 }
 
 #[async_trait]
@@ -25,17 +26,19 @@ impl SimpleQueryHandler for Processor {
         query: &'a str,
     ) -> PgWireResult<Vec<Response<'a>>> {
         let query_handler = self.query_handler.lock().await;
-        query_handler.handle(query).map_err(|e| e.into())
+        query_handler.handle(query).await.unwrap();
+        todo!("Map result to pgwire response");
     }
 }
 
-impl Processor{
-    pub async fn new(
-        data_store: &dyn DataStore,
-        semantic_model: &dyn SemanticModelStore,
-    ) -> Self {
+impl Processor {
+    // TODO: Support generic query handler
+    pub async fn new() -> Self {
         Self {
-            query_handler: Arc::new(Mutex::new(QueryHandler::new(data_store, semantic_model))),
+            query_handler: Arc::new(Mutex::new(QueryHandler::new(
+                TodoDummyDataStore {},
+                LocalSemanticModelStore::new(),
+            ))),
         }
     }
 }
@@ -45,12 +48,9 @@ pub struct ProcessorFactory {
 }
 
 impl ProcessorFactory {
-    pub async fn new(
-        data_store: &dyn DataStore,
-        semantic_model: &dyn SemanticModelStore,
-    ) -> Self {
+    pub async fn new() -> Self {
         Self {
-            handler: Arc::new(Processor::new(data_store, semantic_model).await),
+            handler: Arc::new(Processor::new().await),
         }
     }
 }
