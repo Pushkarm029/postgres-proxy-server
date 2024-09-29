@@ -4,7 +4,7 @@ use thiserror::Error;
 
 /// [`SemanticModel`] store
 /// TODO: make this an async trait with all functions async
-/// 
+///
 /// Since the production semantic model store will be across the network
 /// and a local implementation for testing can be made async trivially
 pub trait SemanticModelStore: Clone {

@@ -1,6 +1,6 @@
+pub mod local_store;
 mod s3_store;
 mod store;
-pub mod local_store;
 
 pub use s3_store::S3SemanticModelStore;
 pub use store::SemanticModelStore;

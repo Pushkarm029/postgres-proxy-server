@@ -40,6 +40,7 @@ where
 
     pub fn parse(&self, query: &str) -> Result<String, SqlParserError> {
         let ast_list = self.parse_query(query)?;
+        // println!("ast_list: {:?}\n", ast_list);
         let transformed_ast_list = self.transform_ast(ast_list)?;
 
         let output_queries: Result<Vec<String>, SqlParserError> = transformed_ast_list
@@ -77,5 +78,89 @@ where
 
     fn ast_to_sql(&self, ast: Statement) -> Result<String, SqlParserError> {
         Ok(ast.to_string())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::SqlParser;
+    use crate::data_store::postgres::{PostgresConfig, PostgresDataStore};
+    use crate::semantic_model::local_store::LocalSemanticModelStore;
+    use rstest::*;
+
+    #[fixture]
+    async fn sql_parser_fixture() -> SqlParser<PostgresDataStore, LocalSemanticModelStore> {
+        let ds = PostgresDataStore::new(PostgresConfig {
+            host: "localhost:5432".to_string(),
+            user: "postgres".to_string(),
+            password: "postgres".to_string(),
+            dbname: "main".to_string(),
+        })
+        .await
+        .unwrap();
+
+        let sm = LocalSemanticModelStore::new();
+        SqlParser::new(ds, sm)
+    }
+
+    // MEASURE(dm_employees.headcount) FROM dm_employees LEFT JOIN dm_departments ON dm_employees.department_level_1 = dm_departments.department_level_1
+    // TODO: fix this case: AS headcount : when AS is not present add measure fetched keyword in AS simple
+    #[rstest]
+    #[case::simple_query(
+        "SELECT department_level_1, MEASURE(dm_employees.headcount) FROM dm_employees;",
+        "SELECT department_level_1, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END) FROM dm_employees"
+    )]
+    #[case::query_with_cte(
+        "WITH cte AS (SELECT department_level_1, MEASURE(dm_employees.headcount) FROM dm_employees) SELECT * FROM cte;",
+        "WITH cte AS (SELECT department_level_1, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END) FROM dm_employees) SELECT * FROM cte"
+    )]
+    #[case::measure_alias_should_be_ignored_first(
+        "SELECT department_level_1, MEASURE(dm_employees.headcount) AS 'MEASURE(headcount)' FROM dm_employees;",
+        "SELECT department_level_1, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END) AS 'MEASURE(headcount)' FROM dm_employees"
+    )]
+    #[case::measure_alias_should_be_ignored_second(
+        "WITH cte AS (SELECT department_level_1, MEASURE(dm_employees.headcount) AS 'measure_headcount' FROM dm_employees) SELECT * FROM cte;",
+        "WITH cte AS (SELECT department_level_1, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END) AS 'measure_headcount' FROM dm_employees) SELECT * FROM cte"
+    )]
+    #[case::test_multiple_tables(
+        "SELECT dm_departments.department_level_1_name, MEASURE(dm_employees.headcount) FROM dm_employees LEFT JOIN dm_departments ON dm_employees.department_level_1 = dm_departments.department_level_1;",
+        "SELECT dm_departments.department_level_1_name, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END) FROM dm_employees LEFT JOIN dm_departments ON dm_employees.department_level_1 = dm_departments.department_level_1"
+    )]
+    // IN THIS CASE, in 2nd measure, we should have distinct, but we got DISTINCT.
+    #[case::test_multiple_measures(
+        "SELECT department_level_1, MEASURE(dm_employees.headcount), MEASURE(dm_employees.ending_headcount) FROM dm_employees;",
+        "SELECT department_level_1, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END), count(DISTINCT dm_employees.effective_date) FROM dm_employees"
+    )]
+    #[case::test_union(
+        "SELECT department_level_1, MEASURE(dm_employees.headcount), false as is_total FROM dm_employees UNION SELECT null as department_level_1, MEASURE(dm_employees.headcount), true as is_total FROM dm_employees;",
+        "SELECT department_level_1, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END), false AS is_total FROM dm_employees UNION SELECT NULL AS department_level_1, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END), true AS is_total FROM dm_employees"
+    )]
+    #[case::test_subquery(
+        "SELECT subquery.department_level_1, MEASURE(dm_employees.headcount) FROM (SELECT * FROM dm_employees) AS subquery;",
+        "SELECT subquery.department_level_1, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END) FROM (SELECT * FROM dm_employees) AS subquery"
+    )]
+    // #[case::interval_statement_in_dialect(
+    //     "SELECT '1 day'::interval as interval_column",
+    //     "SELECT INTERVAL '1 day' as interval_column"
+    // )]
+    // as -> AS, correct or not
+    // 11, 10
+    #[case::test_case_statement(
+        "SELECT CASE WHEN department_level_1 = 'a' THEN 'a' WHEN department_level_1 = 'b' THEN 'b' ELSE 'c' END as case_column FROM dm_employees;",
+        "SELECT CASE WHEN department_level_1 = 'a' THEN 'a' WHEN department_level_1 = 'b' THEN 'b' ELSE 'c' END AS case_column FROM dm_employees"
+    )]
+    #[case::test_distinct_on_snowflake_dialect(
+        "SELECT DISTINCT ON (department_level_1) department_level_1, MEASURE(dm_employees.headcount) FROM dm_employees;",
+        "SELECT DISTINCT ON (department_level_1) department_level_1, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END) FROM dm_employees"
+    )]
+    #[tokio::test]
+    async fn test_parser_on_postgres_dialect(
+        #[future] sql_parser_fixture: SqlParser<PostgresDataStore, LocalSemanticModelStore>,
+        #[case] initial_query: &str,
+        #[case] expected_query: &str,
+    ) {
+        let sql_parser = sql_parser_fixture.await;
+        let transformed_query = sql_parser.parse(initial_query).unwrap();
+        assert_eq!(expected_query, transformed_query);
     }
 }

@@ -1,5 +1,6 @@
 use crate::data_store::{SnowflakeConfig, SnowflakeDataStore};
 use crate::processor::ProcessorFactory;
+use crate::semantic_model::local_store::LocalSemanticModelStore;
 use crate::semantic_model::S3SemanticModelStore;
 use envconfig::Envconfig;
 use log::{error, info};
@@ -36,8 +37,8 @@ struct Config {
 async fn run_tcp_server() {
     env_logger::init();
 
-    let temp_tenant_id_for_testing = "tenant1";
-    let config = Config::init_from_env().unwrap();
+    // let temp_tenant_id_for_testing = "tenant1";
+    // let config = Config::init_from_env().unwrap();
     // let semantic_model = S3SemanticModelStore::new(
     //     temp_tenant_id_for_testing.to_string(),
     //     config.s3_bucket_name,
@@ -57,35 +58,39 @@ async fn run_tcp_server() {
     //     std::process::exit(1);
     // });
 
-    let factory = Arc::new(ProcessorFactory::new().await);
-    let server_address = format!("{}:{}", config.server_host, config.server_port);
+    // let factory = Arc::new(ProcessorFactory::new(
+    //     // data_store,
+    //     LocalSemanticModelStore::new()
+    // )
+    // ).await;
+    // let server_address = format!("{}:{}", config.server_host, config.server_port);
 
-    info!("Starting server at {}", server_address);
+    // info!("Starting server at {}", server_address);
 
-    let listener = TcpListener::bind(server_address.clone())
-        .await
-        .unwrap_or_else(|err| {
-            error!("Failed to bind server address: {}", err);
-            std::process::exit(1);
-        });
+    // let _listener = TcpListener::bind(server_address.clone())
+    //     .await
+    //     .unwrap_or_else(|err| {
+    //         error!("Failed to bind server address: {}", err);
+    //         std::process::exit(1);
+    //     });
 
-    info!("Listening for connections on {}", server_address);
+    // info!("Listening for connections on {}", server_address);
 
-    loop {
-        match listener.accept().await {
-            Ok((tcp_stream, addr)) => {
-                info!("New connection accepted from: {}", addr);
+    // loop {
+    //     match listener.accept().await {
+    //         Ok((tcp_stream, addr)) => {
+    //             info!("New connection accepted from: {}", addr);
 
-                let factory_ref = factory.clone();
-                tokio::spawn(async move {
-                    pgwire::tokio::process_socket(tcp_stream, None, factory_ref).await
-                });
-            }
-            Err(e) => {
-                error!("Failed to accept connection: {}", e);
-            }
-        }
-    }
+    //             let factory_ref = factory.clone();
+    //             tokio::spawn(async move {
+    //                 pgwire::tokio::process_socket(tcp_stream, None, factory_ref).await
+    //             });
+    //         }
+    //         Err(e) => {
+    //             error!("Failed to accept connection: {}", e);
+    //         }
+    //     }
+    // }
 }
 
 #[tokio::main]

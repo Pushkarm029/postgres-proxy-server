@@ -1,4 +1,4 @@
-use crate::data_store::{DataStore, DataStoreError, PostgresType, Row};
+use crate::data_store::{DataStore, DataStoreError, Row};
 use odbc::{odbc_safe::AutocommitOn, safe::Odbc3, Connection, Environment};
 use pgwire::messages::data::DataRow;
 
@@ -48,56 +48,56 @@ impl<'env> DataStore for SnowflakeDataStore<'env> {
         &sqlparser::dialect::SnowflakeDialect {}
     }
 
-    fn map_type(&self, pg_type: &PostgresType) -> Option<String> {
-        match pg_type {
-            PostgresType::Serial => Some("number(6)".to_string()),
-            PostgresType::BigSerial => Some("number(11)".to_string()),
-            PostgresType::SmallInt => Some("number(6)".to_string()),
-            PostgresType::Integer => Some("number(11)".to_string()),
-            PostgresType::BigInt => Some("number(20)".to_string()),
-            PostgresType::Numeric => Some("number".to_string()),
-            PostgresType::Real | PostgresType::DoublePrecision | PostgresType::Money => {
-                Some("float".to_string())
-            }
-            PostgresType::ByteA => Some("binary".to_string()),
-            PostgresType::Varchar
-            | PostgresType::Char
-            | PostgresType::Text
-            | PostgresType::Cidr
-            | PostgresType::Inet
-            | PostgresType::MacAddr
-            | PostgresType::MacAddr8
-            | PostgresType::Bit
-            | PostgresType::Uuid
-            | PostgresType::Xml
-            | PostgresType::TsVector
-            | PostgresType::TsQuery
-            | PostgresType::Interval
-            | PostgresType::Point
-            | PostgresType::Line
-            | PostgresType::LSeg
-            | PostgresType::Box
-            | PostgresType::Path
-            | PostgresType::Polygon
-            | PostgresType::Circle
-            | PostgresType::Array
-            | PostgresType::Composite
-            | PostgresType::Range
-            | PostgresType::PgLsn
-            | PostgresType::Name => Some("text".to_string()),
-            PostgresType::Json | PostgresType::Jsonb | PostgresType::Geometry => {
-                Some("variant".to_string())
-            }
-            PostgresType::Timestamp | PostgresType::TimestampTz => {
-                Some("timestamp_ntz".to_string())
-            }
-            PostgresType::Date => Some("date".to_string()),
-            PostgresType::Time | PostgresType::TimeTz => Some("time".to_string()),
-            PostgresType::Boolean => Some("boolean".to_string()),
-            PostgresType::Oid => Some("number(11)".to_string()),
-            PostgresType::SLTimestamp => Some("timestamp_tz".to_string()),
-        }
-    }
+    // fn map_type(&self, pg_type: &PostgresType) -> Option<String> {
+    //     match pg_type {
+    //         PostgresType::Serial => Some("number(6)".to_string()),
+    //         PostgresType::BigSerial => Some("number(11)".to_string()),
+    //         PostgresType::SmallInt => Some("number(6)".to_string()),
+    //         PostgresType::Integer => Some("number(11)".to_string()),
+    //         PostgresType::BigInt => Some("number(20)".to_string()),
+    //         PostgresType::Numeric => Some("number".to_string()),
+    //         PostgresType::Real | PostgresType::DoublePrecision | PostgresType::Money => {
+    //             Some("float".to_string())
+    //         }
+    //         PostgresType::ByteA => Some("binary".to_string()),
+    //         PostgresType::Varchar
+    //         | PostgresType::Char
+    //         | PostgresType::Text
+    //         | PostgresType::Cidr
+    //         | PostgresType::Inet
+    //         | PostgresType::MacAddr
+    //         | PostgresType::MacAddr8
+    //         | PostgresType::Bit
+    //         | PostgresType::Uuid
+    //         | PostgresType::Xml
+    //         | PostgresType::TsVector
+    //         | PostgresType::TsQuery
+    //         | PostgresType::Interval
+    //         | PostgresType::Point
+    //         | PostgresType::Line
+    //         | PostgresType::LSeg
+    //         | PostgresType::Box
+    //         | PostgresType::Path
+    //         | PostgresType::Polygon
+    //         | PostgresType::Circle
+    //         | PostgresType::Array
+    //         | PostgresType::Composite
+    //         | PostgresType::Range
+    //         | PostgresType::PgLsn
+    //         | PostgresType::Name => Some("text".to_string()),
+    //         PostgresType::Json | PostgresType::Jsonb | PostgresType::Geometry => {
+    //             Some("variant".to_string())
+    //         }
+    //         PostgresType::Timestamp | PostgresType::TimestampTz => {
+    //             Some("timestamp_ntz".to_string())
+    //         }
+    //         PostgresType::Date => Some("date".to_string()),
+    //         PostgresType::Time | PostgresType::TimeTz => Some("time".to_string()),
+    //         PostgresType::Boolean => Some("boolean".to_string()),
+    //         PostgresType::Oid => Some("number(11)".to_string()),
+    //         PostgresType::SLTimestamp => Some("timestamp_tz".to_string()),
+    //     }
+    // }
 
     fn map_function(&self, pg_function: &str) -> Option<String> {
         match pg_function {

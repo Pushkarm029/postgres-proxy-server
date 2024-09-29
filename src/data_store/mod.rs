@@ -1,9 +1,9 @@
-mod postgres;
+pub mod postgres;
 mod snowflake;
 
 use pgwire::messages::data;
 use pgwire::messages::data::DataRow;
-use postgres::PostgresType;
+// use postgres::PostgresType;
 pub use snowflake::SnowflakeConfig;
 pub use snowflake::SnowflakeDataStore;
 
@@ -17,7 +17,7 @@ pub trait DataStore: Clone {
     /// Mapping Postgres types to [`DataStore`] specific types
     ///
     /// TODO: perhaps the input type should be the pgwire representation of types
-    fn map_type(&self, pg_type: &PostgresType) -> Option<String>;
+    // fn map_type(&self, pg_type: &PostgresType) -> Option<String>;
     /// Mapping inbuilt Postgres functions to [`DataStore`] specific functions
     ///
     /// For example, Postgres `now()` function for returning current timestamp
@@ -47,6 +47,7 @@ pub enum Value {
     Object(HashMap<String, Value>),
 }
 
+#[derive(Debug)]
 pub enum DataStoreError {
     ConnectionError(String),
     QueryError(String),
@@ -68,9 +69,9 @@ impl DataStore for TodoDummyDataStore {
         todo!()
     }
 
-    fn map_type(&self, pg_type: &PostgresType) -> Option<String> {
-        todo!()
-    }
+    // fn map_type(&self, pg_type: &PostgresType) -> Option<String> {
+    //     todo!()
+    // }
 
     fn map_function(&self, pg_function: &str) -> Option<String> {
         todo!()

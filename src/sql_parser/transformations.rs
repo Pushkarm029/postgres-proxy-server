@@ -37,6 +37,7 @@ where
     match set_expr {
         SetExpr::Select(select) => {
             for projection in &mut select.projection {
+                // println!("projection: {:?}\n", projection);
                 match projection {
                     SelectItem::UnnamedExpr(expr) => {
                         rewrite_expression(expr, data_store, semantic_model)?
@@ -79,22 +80,22 @@ where
     D: DataStore,
     S: SemanticModelStore,
 {
-    *expr = match std::mem::replace(expr, Expr::Value(Value::Null)) {
-        Expr::Function(mut func) => {
-            if func.name.to_string().to_uppercase() == "MEASURE" {
-                rewrite_measure(&mut func, data_store, semantic_model)?;
+    let new_expr = match expr {
+        Expr::Function(func) => {
+            let mut new_func = func.clone();
+            if new_func.name.to_string().to_uppercase() == "MEASURE" {
+                rewrite_measure(&mut new_func, data_store, semantic_model)?;
             } else {
                 // Apply data_store-specific function mappings
                 // if let Some(mapped_func) = data_store.map_function(func.name.to_string().as_str()) {
-                //     func.name = ObjectName(vec![Ident::new(mapped_func)]);
+                //     new_func.name = ObjectName(vec![Ident::new(mapped_func)]);
                 // }
             }
-
-            Expr::Function(func)
+            Expr::Function(new_func)
         }
         Expr::BinaryOp { left, right, op } => {
-            let mut new_left = *left;
-            let mut new_right = *right;
+            let mut new_left = left.as_ref().clone();
+            let mut new_right = right.as_ref().clone();
             rewrite_expression(&mut new_left, data_store, semantic_model)?;
             rewrite_expression(&mut new_right, data_store, semantic_model)?;
             Expr::BinaryOp {
@@ -103,15 +104,18 @@ where
                 op: op.clone(),
             }
         }
-        Expr::Exists {
-            mut subquery,
-            negated,
-        } => {
-            apply_transformations(&mut subquery, data_store, semantic_model)?;
-            Expr::Exists { negated, subquery }
+        Expr::Exists { subquery, negated } => {
+            let mut new_subquery = subquery.as_ref().clone();
+            apply_transformations(&mut new_subquery, data_store, semantic_model)?;
+            Expr::Exists {
+                subquery: Box::new(new_subquery),
+                negated: *negated,
+            }
         }
         _ => expr.clone(),
     };
+
+    *expr = new_expr;
     Ok(())
 }
 
@@ -150,7 +154,9 @@ where
         ));
     }
 
+    println!("args: {:?}\n", args.args);
     let ident = match &args.args[0] {
+        // TODO: needs fix, it is not accessary to have table name with keyword everytime.
         FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::CompoundIdentifier(ident))) => ident,
         _ => {
             return Err(SqlParserError::MeasureFunctionError(
@@ -195,6 +201,16 @@ where
                 "MEASURE function expects a single function expression".to_string(),
             ))
         }
+    };
+
+    *func = Function {
+        name: ObjectName(vec![Ident::new(expr.to_string())]),
+        args: FunctionArguments::None,
+        over: None,
+        parameters: FunctionArguments::None,
+        filter: None,
+        null_treatment: None,
+        within_group: vec![],
     };
 
     Ok(expr)
