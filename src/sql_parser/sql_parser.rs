@@ -163,4 +163,19 @@ mod test {
         let transformed_query = sql_parser.parse(initial_query).unwrap();
         assert_eq!(expected_query, transformed_query);
     }
+
+    #[rstest]
+    #[case::simple_update("UPDATE employees SET salary = 60000 WHERE employee_id = 101;")]
+    #[case::multiple_column_update("UPDATE products SET price = 49.99, stock_quantity = stock_quantity - 10 WHERE product_id = 456;")]
+    #[case::subquery_update("UPDATE orders SET total_amount = (SELECT SUM(price * quantity) FROM order_items WHERE order_items.order_id = orders.order_id) WHERE order_id = 1234;")]
+    #[case::conditional_update("UPDATE users SET status = CASE WHEN last_login IS NULL THEN 'Inactive' WHEN last_login < NOW() - INTERVAL '1 YEAR' THEN 'Inactive' ELSE 'Active' END;")]
+    #[tokio::test]
+    async fn test_reject_modify_function(
+        #[future] sql_parser_fixture: SqlParser<PostgresDataStore, LocalSemanticModelStore>,
+        #[case] query: &str,
+    ) {
+        let sql_parser = sql_parser_fixture.await;
+        let transformed_query = sql_parser.parse(query);
+        assert!(transformed_query.is_err());
+    }
 }
