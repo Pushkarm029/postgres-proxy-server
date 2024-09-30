@@ -37,7 +37,6 @@ where
     match set_expr {
         SetExpr::Select(select) => {
             for projection in &mut select.projection {
-                // println!("projection: {:?}\n", projection);
                 match projection {
                     SelectItem::UnnamedExpr(expr) => {
                         rewrite_expression(expr, data_store, semantic_model)?
@@ -87,9 +86,17 @@ where
                 rewrite_measure(&mut new_func, data_store, semantic_model)?;
             } else {
                 // Apply data_store-specific function mappings
-                // if let Some(mapped_func) = data_store.map_function(func.name.to_string().as_str()) {
-                //     new_func.name = ObjectName(vec![Ident::new(mapped_func)]);
-                // }
+                if let Some(mapped_func) = data_store.map_function(func.to_string().as_str()) {
+                    new_func = Function {
+                        name: ObjectName(vec![Ident::new(mapped_func)]),
+                        args: FunctionArguments::None,
+                        over: None,
+                        parameters: FunctionArguments::None,
+                        filter: None,
+                        null_treatment: None,
+                        within_group: vec![],
+                    };
+                }
             }
             Expr::Function(new_func)
         }
@@ -154,7 +161,8 @@ where
         ));
     }
 
-    println!("args: {:?}\n", args.args);
+    println!("ident: {:?}", args);
+
     let ident = match &args.args[0] {
         // TODO: needs fix, it is not accessary to have table name with keyword everytime.
         FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::CompoundIdentifier(ident))) => ident,

@@ -40,7 +40,6 @@ where
 
     pub fn parse(&self, query: &str) -> Result<String, SqlParserError> {
         let ast_list = self.parse_query(query)?;
-        // println!("ast_list: {:?}\n", ast_list);
         let transformed_ast_list = self.transform_ast(ast_list)?;
 
         let output_queries: Result<Vec<String>, SqlParserError> = transformed_ast_list
@@ -103,8 +102,11 @@ mod test {
         SqlParser::new(ds, sm)
     }
 
-    // MEASURE(dm_employees.headcount) FROM dm_employees LEFT JOIN dm_departments ON dm_employees.department_level_1 = dm_departments.department_level_1
-    // TODO: fix this case: AS headcount : when AS is not present add measure fetched keyword in AS simple
+    // TODO: CONFUSED?: Do we need this : when AS is not present add measure fetched keyword in AS automatically. for example
+    // 1. for SELECT department_level_1, MEASURE(dm_employees.headcount) FROM dm_employees;
+    // SELECT department_level_1, COUNT(...) AS headcount FROM dm_employees
+    // OR
+    // SELECT department_level_1, COUNT(...) FROM dm_employees
     #[rstest]
     #[case::simple_query(
         "SELECT department_level_1, MEASURE(dm_employees.headcount) FROM dm_employees;",
@@ -154,7 +156,7 @@ mod test {
         "SELECT DISTINCT ON (department_level_1) department_level_1, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END) FROM dm_employees"
     )]
     #[tokio::test]
-    async fn test_parser_on_postgres_dialect(
+    async fn test_parser_on_postgres(
         #[future] sql_parser_fixture: SqlParser<PostgresDataStore, LocalSemanticModelStore>,
         #[case] initial_query: &str,
         #[case] expected_query: &str,
@@ -162,6 +164,22 @@ mod test {
         let sql_parser = sql_parser_fixture.await;
         let transformed_query = sql_parser.parse(initial_query).unwrap();
         assert_eq!(expected_query, transformed_query);
+    }
+
+    #[rstest]
+    #[case::test_now_function(
+        "SELECT employee_id, name, now() AS now FROM employees WHERE department = 'Sales';",
+        "SELECT employee_id, name, CURRENT_TIMESTAMP AS now FROM employees WHERE department = 'Sales'"
+    )]
+    #[tokio::test]
+    async fn test_func_parser_on_postgres(
+        #[future] sql_parser_fixture: SqlParser<PostgresDataStore, LocalSemanticModelStore>,
+        #[case] initial_query: &str,
+        #[case] expected_query: &str,
+    ) {
+        let sql_parser = sql_parser_fixture.await;
+        let transformed_query = sql_parser.parse(initial_query).unwrap();
+        assert_eq!(expected_query, transformed_query.to_string());
     }
 
     #[rstest]

@@ -2,6 +2,8 @@ use crate::data_store::{DataStoreClient, DataStoreError, DataStoreMapping};
 use odbc::{odbc_safe::AutocommitOn, safe::Odbc3, Connection, Environment};
 use pgwire::messages::data::DataRow;
 
+use super::DataStore;
+
 #[derive(Clone)]
 pub struct SnowflakeConfig {
     pub account: String,
@@ -113,3 +115,5 @@ impl<'env> DataStoreClient for SnowflakeDataStore<'env> {
         todo!()
     }
 }
+
+impl<'env> DataStore for SnowflakeDataStore<'env> {}

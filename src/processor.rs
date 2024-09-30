@@ -1,4 +1,4 @@
-use crate::data_store::{DataStoreClient, DataStoreMapping};
+use crate::data_store::DataStore;
 use crate::query_handler::QueryHandler;
 use crate::semantic_model::SemanticModelStore;
 use async_trait::async_trait;
@@ -15,7 +15,7 @@ use tokio::sync::Mutex;
 
 pub struct Processor<D, S>
 where
-    D: DataStoreClient + DataStoreMapping,
+    D: DataStore,
     S: SemanticModelStore,
 {
     query_handler: Arc<Mutex<QueryHandler<D, S>>>,
@@ -24,7 +24,7 @@ where
 #[async_trait]
 impl<D, S> SimpleQueryHandler for Processor<D, S>
 where
-    D: DataStoreClient + DataStoreMapping + Send + Sync,
+    D: DataStore + Send + Sync,
     S: SemanticModelStore + Send + Sync,
 {
     async fn do_query<'a, C>(
@@ -40,10 +40,10 @@ where
 
 impl<D, S> Processor<D, S>
 where
-    D: DataStoreClient + DataStoreMapping,
+    D: DataStore,
     S: SemanticModelStore,
 {
-    pub async fn new(data_store: D, semantic_model: S) -> Self {
+    pub fn new(data_store: D, semantic_model: S) -> Self {
         Self {
             query_handler: Arc::new(Mutex::new(QueryHandler::new(data_store, semantic_model))),
         }
@@ -52,7 +52,7 @@ where
 
 pub struct ProcessorFactory<D, S>
 where
-    D: DataStoreClient + DataStoreMapping,
+    D: DataStore,
     S: SemanticModelStore,
 {
     handler: Arc<Processor<D, S>>,
@@ -60,19 +60,19 @@ where
 
 impl<D, S> ProcessorFactory<D, S>
 where
-    D: DataStoreClient + DataStoreMapping + Send + Sync,
-    S: SemanticModelStore + Send + Sync,
+    D: DataStore,
+    S: SemanticModelStore,
 {
-    pub async fn new(data_store: D, semantic_model: S) -> Self {
+    pub fn new(data_store: D, semantic_model: S) -> Self {
         Self {
-            handler: Arc::new(Processor::new(data_store, semantic_model).await),
+            handler: Arc::new(Processor::new(data_store, semantic_model)),
         }
     }
 }
 
 impl<D, S> PgWireHandlerFactory for ProcessorFactory<D, S>
 where
-    D: DataStoreClient + DataStoreMapping + Send + Sync,
+    D: DataStore + Send + Sync,
     S: SemanticModelStore + Send + Sync,
 {
     type StartupHandler = NoopStartupHandler;

@@ -3,6 +3,7 @@ mod snowflake;
 
 // use pgwire::messages::data;
 use pgwire::messages::data::DataRow;
+use postgres::PostgresDataStore;
 // use postgres::PostgresType;
 pub use snowflake::SnowflakeConfig;
 pub use snowflake::SnowflakeDataStore;
@@ -10,30 +11,48 @@ pub use snowflake::SnowflakeDataStore;
 use std::collections::HashMap;
 use std::fmt;
 
-// /// DataStore executes and SQL query and returns the data
-// pub trait DataStore: Clone {
-//     /// Dialect supported by the [`DataStore`]
-//     fn get_dialect(&self) -> &dyn sqlparser::dialect::Dialect;
-//     /// Mapping Postgres types to [`DataStore`] specific types
-//     ///
-//     /// TODO: perhaps the input type should be the pgwire representation of types
-//     // fn map_type(&self, pg_type: &PostgresType) -> Option<String>;
-//     /// Mapping inbuilt Postgres functions to [`DataStore`] specific functions
-//     ///
-//     /// For example, Postgres `now()` function for returning current timestamp
-//     /// is mapped to `CURRENT_TIMESTAMP()` in Snowflake
-//     fn map_function(&self, pg_function: &str) -> Option<String>;
-//     /// Execute the query and return the result as [`DataRow`]s
-//     ///
-//     /// The data store must internally map the result data into the
-//     /// pgwire [`DataRow`] type.
-//     fn execute(&self, sql: &str) -> Result<Vec<DataRow>, DataStoreError>;
-//     // TODO: add execute_streaming that returns a stream instead of vec
-// }
+pub trait DataStore: DataStoreClient + DataStoreMapping + Clone {}
+
+#[derive(Clone)]
+pub enum DataStoreType<'a> {
+    Postgres(PostgresDataStore),
+    Snowflake(SnowflakeDataStore<'a>),
+}
+
+impl DataStore for DataStoreType<'_> {}
+
+impl DataStoreMapping for DataStoreType<'_> {
+    fn get_dialect(&self) -> &dyn sqlparser::dialect::Dialect {
+        match self {
+            DataStoreType::Postgres(pg_store) => pg_store.get_dialect(),
+            DataStoreType::Snowflake(snowflake_store) => snowflake_store.get_dialect(),
+        }
+    }
+    fn map_function(&self, pg_function: &str) -> Option<String> {
+        match self {
+            DataStoreType::Postgres(pg_store) => pg_store.map_function(pg_function),
+            DataStoreType::Snowflake(snowflake_store) => snowflake_store.map_function(pg_function),
+        }
+    }
+
+    // Implement type mapping if necessary
+    // fn map_type(&self, pg_type: &PostgresType) -> Option<String> {
+    //     // Example mapping
+    // }
+}
+
+impl DataStoreClient for DataStoreType<'_> {
+    fn execute(&self, sql: &str) -> Result<Vec<DataRow>, DataStoreError> {
+        match self {
+            DataStoreType::Postgres(pg_store) => pg_store.execute(sql),
+            DataStoreType::Snowflake(snowflake_store) => snowflake_store.execute(sql),
+        }
+    }
+}
 
 /// DataStoreMapping handles the mapping logic for types and functions
 /// between different SQL dialects.
-pub trait DataStoreMapping: Clone {
+pub trait DataStoreMapping {
     /// Dialect supported by the [`DataStoreMapping`]
     fn get_dialect(&self) -> &dyn sqlparser::dialect::Dialect;
 
@@ -51,7 +70,7 @@ pub trait DataStoreMapping: Clone {
 
 /// DataStoreClient is responsible for executing queries and returning
 /// results from the DataStore.
-pub trait DataStoreClient: Clone {
+pub trait DataStoreClient {
     /// Execute the SQL query and return the result as [`DataRow`]s.
     ///
     /// The DataStore must internally map the result data into the
@@ -88,29 +107,19 @@ pub enum DataStoreError {
 
 impl fmt::Display for DataStoreError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        match self {
+            DataStoreError::ConnectionError(details) => {
+                write!(f, "Connection error: {}", details)
+            }
+            DataStoreError::QueryError(details) => {
+                write!(f, "Query error: {}", details)
+            }
+            DataStoreError::InsufficientPrivileges(details) => {
+                write!(f, "Insufficient privileges: {}", details)
+            }
+            DataStoreError::ColumnNotFound(details) => {
+                write!(f, "Column not found: {}", details)
+            }
+        }
     }
 }
-
-// #[derive(Clone)]
-// pub struct TodoDummyDataStore;
-
-// impl DataStoreMapping for TodoDummyDataStore {
-//     fn get_dialect(&self) -> &dyn sqlparser::dialect::Dialect {
-//         todo!()
-//     }
-
-//     // fn map_type(&self, pg_type: &PostgresType) -> Option<String> {
-//     //     todo!()
-//     // }
-
-//     fn map_function(&self, pg_function: &str) -> Option<String> {
-//         todo!()
-//     }
-// }
-
-// impl DataStoreClient for TodoDummyDataStore {
-//     fn execute(&self, _sql: &str) -> Result<Vec<DataRow>, DataStoreError> {
-//         todo!()
-//     }
-// }

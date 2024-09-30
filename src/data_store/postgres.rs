@@ -4,10 +4,12 @@ use pgwire::messages::data::DataRow;
 use sqlparser::dialect::PostgreSqlDialect;
 use tokio_postgres::{Client, NoTls};
 
+use super::DataStore;
+
 pub struct PostgresConfig {
-    pub host: String,
     pub user: String,
     pub password: String,
+    pub host: String,
     pub dbname: String,
 }
 
@@ -54,8 +56,8 @@ impl DataStoreMapping for PostgresDataStore {
 
     fn map_function(&self, pg_function: &str) -> Option<String> {
         match pg_function {
-            "now()" => Some("CURRENT_TIMESTAMP".to_string()), // Example of mapping
-            _ => Some(pg_function.to_string()), // PostgreSQL supports most functions directly
+            "now()" => Some("CURRENT_TIMESTAMP".to_string()),
+            _ => Some(pg_function.to_string()),
         }
     }
 
@@ -90,3 +92,5 @@ impl DataStoreClient for PostgresDataStore {
         todo!("TODO")
     }
 }
+
+impl DataStore for PostgresDataStore {}
