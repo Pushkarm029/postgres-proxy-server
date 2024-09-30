@@ -1,4 +1,4 @@
-use crate::data_store::DataStore;
+use crate::data_store::{DataStoreClient, DataStoreMapping};
 use crate::semantic_model::SemanticModelStore;
 use crate::sql_parser::SqlParser;
 use pgwire::{
@@ -13,7 +13,7 @@ pub struct QueryHandler<D, S> {
 
 impl<D, S> QueryHandler<D, S>
 where
-    D: DataStore,
+    D: DataStoreClient + DataStoreMapping,
     S: SemanticModelStore,
 {
     pub fn new(data_store: D, semantic_model: S) -> Self {

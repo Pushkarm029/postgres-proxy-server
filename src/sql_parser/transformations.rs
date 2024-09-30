@@ -1,4 +1,4 @@
-use crate::data_store::DataStore;
+use crate::data_store::DataStoreMapping;
 use crate::semantic_model::SemanticModelStore;
 use crate::sql_parser::SqlParserError;
 use sqlparser::ast::*;
@@ -10,7 +10,7 @@ pub fn apply_transformations<D, S>(
     semantic_model: &S,
 ) -> Result<(), SqlParserError>
 where
-    D: DataStore,
+    D: DataStoreMapping,
     S: SemanticModelStore,
 {
     // First apply the transformations for the body, then each cte recursively
@@ -31,7 +31,7 @@ fn apply_set_expression<D, S>(
     semantic_model: &S,
 ) -> Result<(), SqlParserError>
 where
-    D: DataStore,
+    D: DataStoreMapping,
     S: SemanticModelStore,
 {
     match set_expr {
@@ -77,7 +77,7 @@ fn rewrite_expression<D, S>(
     semantic_model: &S,
 ) -> Result<(), SqlParserError>
 where
-    D: DataStore,
+    D: DataStoreMapping,
     S: SemanticModelStore,
 {
     let new_expr = match expr {
@@ -136,7 +136,7 @@ fn rewrite_measure<D, S>(
     semantic_model: &S,
 ) -> Result<Expr, SqlParserError>
 where
-    D: DataStore,
+    D: DataStoreMapping,
     S: SemanticModelStore,
 {
     let args = match &func.args {

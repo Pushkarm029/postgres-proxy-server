@@ -1,4 +1,4 @@
-use crate::data_store::DataStore;
+use crate::data_store::DataStoreMapping;
 use crate::semantic_model::SemanticModelStore;
 use crate::sql_parser::transformations;
 use sqlparser::ast::*;
@@ -28,7 +28,7 @@ pub struct SqlParser<D, S> {
 
 impl<D, S> SqlParser<D, S>
 where
-    D: DataStore,
+    D: DataStoreMapping,
     S: SemanticModelStore,
 {
     pub fn new(data_store: D, semantic_model: S) -> Self {

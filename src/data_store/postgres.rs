@@ -1,4 +1,4 @@
-use crate::data_store::{DataStore, DataStoreError, Row};
+use crate::data_store::{DataStoreClient, DataStoreError, DataStoreMapping};
 use async_trait::async_trait;
 use pgwire::messages::data::DataRow;
 use sqlparser::dialect::PostgreSqlDialect;
@@ -18,16 +18,10 @@ pub struct PostgresDataStore {
 
 impl PostgresDataStore {
     pub async fn new(config: PostgresConfig) -> Result<Self, DataStoreError> {
-        // let connection_string = format!(
-        //     "host={} user={} password={} dbname={}",
-        //     config.host, config.user, config.password, config.dbname
-        // );
-
-        let connection_string: String = format!(
+        let connection_string = format!(
             "postgres://{}:{}@{}/{}",
             config.user, config.password, config.host, config.dbname
         );
-        // postgres://postgres:postgres@localhost:5432/information_schema
 
         let (client, connection) = tokio_postgres::connect(&connection_string, NoTls)
             .await
@@ -46,25 +40,34 @@ impl PostgresDataStore {
 
 impl<'a> Clone for PostgresDataStore {
     fn clone(&self) -> Self {
+        // Implement a way to clone the client, or manage a new connection
+        // Note: tokio_postgres::Client is not cloneable, so you would need
+        // to re-establish the connection or share the same client connection
         todo!("Make the data store/connection cloneable")
     }
 }
 
-#[async_trait]
-impl DataStore for PostgresDataStore {
+impl DataStoreMapping for PostgresDataStore {
     fn get_dialect(&self) -> &dyn sqlparser::dialect::Dialect {
         &PostgreSqlDialect {}
     }
 
     fn map_function(&self, pg_function: &str) -> Option<String> {
         match pg_function {
-            "now()" => Some("CURRENT_TIMESTAMP".to_string()),
-            _ => Some(pg_function.to_string()), // No mapping needed, PostgreSQL supports most functions
+            "now()" => Some("CURRENT_TIMESTAMP".to_string()), // Example of mapping
+            _ => Some(pg_function.to_string()), // PostgreSQL supports most functions directly
         }
     }
 
-    // async fn execute(&self, query: &str) -> Result<Vec<DataRow>, DataStoreError> {
-    fn execute(&self, query: &str) -> Result<Vec<DataRow>, DataStoreError> {
+    // Implement type mapping if necessary
+    // fn map_type(&self, pg_type: &PostgresType) -> Option<String> {
+    //     // Example mapping
+    // }
+}
+
+// #[async_trait]
+impl DataStoreClient for PostgresDataStore {
+    fn execute(&self, sql: &str) -> Result<Vec<DataRow>, DataStoreError> {
         // let rows = self.client.query(query, &[]).await.map_err(|e| {
         //     DataStoreError::QueryError(format!("Error executing query: {}", e))
         // })?;

@@ -1,4 +1,4 @@
-use crate::data_store::{DataStore, DataStoreError, Row};
+use crate::data_store::{DataStoreClient, DataStoreError, DataStoreMapping};
 use odbc::{odbc_safe::AutocommitOn, safe::Odbc3, Connection, Environment};
 use pgwire::messages::data::DataRow;
 
@@ -43,7 +43,7 @@ impl<'a> SnowflakeDataStore<'a> {
     }
 }
 
-impl<'env> DataStore for SnowflakeDataStore<'env> {
+impl<'env> DataStoreMapping for SnowflakeDataStore<'env> {
     fn get_dialect(&self) -> &dyn sqlparser::dialect::Dialect {
         &sqlparser::dialect::SnowflakeDialect {}
     }
@@ -106,7 +106,9 @@ impl<'env> DataStore for SnowflakeDataStore<'env> {
             _ => Some(pg_function.to_string()),
         }
     }
+}
 
+impl<'env> DataStoreClient for SnowflakeDataStore<'env> {
     fn execute(&self, query: &str) -> Result<Vec<DataRow>, DataStoreError> {
         todo!()
     }

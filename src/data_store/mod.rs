@@ -1,7 +1,7 @@
 pub mod postgres;
 mod snowflake;
 
-use pgwire::messages::data;
+// use pgwire::messages::data;
 use pgwire::messages::data::DataRow;
 // use postgres::PostgresType;
 pub use snowflake::SnowflakeConfig;
@@ -10,25 +10,56 @@ pub use snowflake::SnowflakeDataStore;
 use std::collections::HashMap;
 use std::fmt;
 
-/// DataStore executes and SQL query and returns the data
-pub trait DataStore: Clone {
-    /// Dialect supported by the [`DataStore`]
+// /// DataStore executes and SQL query and returns the data
+// pub trait DataStore: Clone {
+//     /// Dialect supported by the [`DataStore`]
+//     fn get_dialect(&self) -> &dyn sqlparser::dialect::Dialect;
+//     /// Mapping Postgres types to [`DataStore`] specific types
+//     ///
+//     /// TODO: perhaps the input type should be the pgwire representation of types
+//     // fn map_type(&self, pg_type: &PostgresType) -> Option<String>;
+//     /// Mapping inbuilt Postgres functions to [`DataStore`] specific functions
+//     ///
+//     /// For example, Postgres `now()` function for returning current timestamp
+//     /// is mapped to `CURRENT_TIMESTAMP()` in Snowflake
+//     fn map_function(&self, pg_function: &str) -> Option<String>;
+//     /// Execute the query and return the result as [`DataRow`]s
+//     ///
+//     /// The data store must internally map the result data into the
+//     /// pgwire [`DataRow`] type.
+//     fn execute(&self, sql: &str) -> Result<Vec<DataRow>, DataStoreError>;
+//     // TODO: add execute_streaming that returns a stream instead of vec
+// }
+
+/// DataStoreMapping handles the mapping logic for types and functions
+/// between different SQL dialects.
+pub trait DataStoreMapping: Clone {
+    /// Dialect supported by the [`DataStoreMapping`]
     fn get_dialect(&self) -> &dyn sqlparser::dialect::Dialect;
-    /// Mapping Postgres types to [`DataStore`] specific types
+
+    /// Mapping inbuilt Postgres functions to DataStore specific functions.
     ///
-    /// TODO: perhaps the input type should be the pgwire representation of types
-    // fn map_type(&self, pg_type: &PostgresType) -> Option<String>;
-    /// Mapping inbuilt Postgres functions to [`DataStore`] specific functions
-    ///
-    /// For example, Postgres `now()` function for returning current timestamp
-    /// is mapped to `CURRENT_TIMESTAMP()` in Snowflake
+    /// For example, Postgres `now()` function for returning the current timestamp
+    /// is mapped to `CURRENT_TIMESTAMP()` in Snowflake.
     fn map_function(&self, pg_function: &str) -> Option<String>;
-    /// Execute the query and return the result as [`DataRow`]s
+
+    // You can uncomment or add type mapping functions when necessary
+    // /// Mapping Postgres types to DataStore specific types
+    // /// TODO: perhaps the input type should be the pgwire representation of types
+    // fn map_type(&self, pg_type: &PostgresType) -> Option<String>;
+}
+
+/// DataStoreClient is responsible for executing queries and returning
+/// results from the DataStore.
+pub trait DataStoreClient: Clone {
+    /// Execute the SQL query and return the result as [`DataRow`]s.
     ///
-    /// The data store must internally map the result data into the
+    /// The DataStore must internally map the result data into the
     /// pgwire [`DataRow`] type.
     fn execute(&self, sql: &str) -> Result<Vec<DataRow>, DataStoreError>;
-    // TODO: add execute_streaming that returns a stream instead of vec
+
+    // TODO: Add execute_streaming that returns a stream instead of a vector of data rows
+    // fn execute_streaming(&self, sql: &str) -> Result<Stream<DataRow>, DataStoreError>;
 }
 
 pub struct Row {
@@ -61,23 +92,25 @@ impl fmt::Display for DataStoreError {
     }
 }
 
-#[derive(Clone)]
-pub struct TodoDummyDataStore;
+// #[derive(Clone)]
+// pub struct TodoDummyDataStore;
 
-impl DataStore for TodoDummyDataStore {
-    fn get_dialect(&self) -> &dyn sqlparser::dialect::Dialect {
-        todo!()
-    }
+// impl DataStoreMapping for TodoDummyDataStore {
+//     fn get_dialect(&self) -> &dyn sqlparser::dialect::Dialect {
+//         todo!()
+//     }
 
-    // fn map_type(&self, pg_type: &PostgresType) -> Option<String> {
-    //     todo!()
-    // }
+//     // fn map_type(&self, pg_type: &PostgresType) -> Option<String> {
+//     //     todo!()
+//     // }
 
-    fn map_function(&self, pg_function: &str) -> Option<String> {
-        todo!()
-    }
+//     fn map_function(&self, pg_function: &str) -> Option<String> {
+//         todo!()
+//     }
+// }
 
-    fn execute(&self, sql: &str) -> Result<Vec<DataRow>, DataStoreError> {
-        todo!()
-    }
-}
+// impl DataStoreClient for TodoDummyDataStore {
+//     fn execute(&self, _sql: &str) -> Result<Vec<DataRow>, DataStoreError> {
+//         todo!()
+//     }
+// }
