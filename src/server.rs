@@ -110,8 +110,7 @@ async fn run_tcp_server() {
 
                 let factory_ref = factory.clone();
                 tokio::spawn(async move {
-                    // TODO; fix me
-                    // pgwire::tokio::process_socket(tcp_stream, None, factory_ref).await
+                    pgwire::tokio::process_socket(tcp_stream, None, factory_ref).await
                 });
             }
             Err(e) => {

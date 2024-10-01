@@ -1,8 +1,11 @@
 use crate::data_store::{DataStoreClient, DataStoreError, DataStoreMapping};
-use odbc::{odbc_safe::AutocommitOn, safe::Odbc3, Connection, Environment};
-use pgwire::messages::data::DataRow;
-
+// use odbc::{odbc_safe::AutocommitOn, safe::Odbc3, Connection, Environment, ResultSetState, Statement};
 use super::DataStore;
+use async_trait::async_trait;
+use pgwire::api::results::Response;
+use pgwire::messages::data::DataRow;
+use snowflake_connector_rs::SnowflakeSession;
+use snowflake_connector_rs::{SnowflakeAuthMethod, SnowflakeClient, SnowflakeClientConfig};
 
 #[derive(Clone)]
 pub struct SnowflakeConfig {
@@ -14,92 +17,65 @@ pub struct SnowflakeConfig {
     pub schema: String,
 }
 
-pub struct SnowflakeDataStore<'a> {
+pub struct SnowflakeDataStore {
     config: SnowflakeConfig,
-    env: Environment<Odbc3>,
-    conn: Connection<'a, AutocommitOn>,
+    client: SnowflakeClient,
 }
 
-impl<'a> Clone for SnowflakeDataStore<'a> {
+// TODO: Fix me
+impl Clone for SnowflakeDataStore {
     fn clone(&self) -> Self {
-        todo!("Make the data store/connection cloneable")
+        SnowflakeDataStore {
+            config: self.config.clone(),
+            client: SnowflakeClient::new(
+                &self.config.user,
+                SnowflakeAuthMethod::Password(self.config.password.clone()),
+                SnowflakeClientConfig {
+                    account: self.config.account.clone(),
+                    warehouse: Some(self.config.warehouse.clone()),
+                    database: Some(self.config.database.clone()),
+                    schema: Some(self.config.schema.clone()),
+                    ..Default::default()
+                },
+            )
+            .unwrap(),
+        }
     }
 }
 
-impl<'a> SnowflakeDataStore<'a> {
+impl SnowflakeDataStore {
     pub fn new(config: SnowflakeConfig) -> Result<Self, DataStoreError> {
-        let connection_string = format!(
-            "Driver={{SnowflakeDSIIDriver}};Server={}.snowflakecomputing.com;Uid={};Pwd={};Warehouse={};Database={};Schema={};",
-            config.account, config.user, config.password, config.warehouse, config.database, config.schema
-        );
+        Ok(SnowflakeDataStore {
+            config: config.clone(),
+            client: SnowflakeClient::new(
+                &config.account,
+                SnowflakeAuthMethod::Password(config.password.clone()),
+                SnowflakeClientConfig {
+                    account: config.account.clone(),
+                    warehouse: Some(config.warehouse.clone()),
+                    database: Some(config.database.clone()),
+                    schema: Some(config.schema.clone()),
+                    ..Default::default()
+                },
+            )
+            .unwrap(),
+        })
+    }
 
-        let env = Environment::new().map_err(|e| match e {
-            Some(e) => DataStoreError::ConnectionError(e.to_string()),
-            None => DataStoreError::ConnectionError("TODO: something here".to_string()),
-        })?;
-        let conn = env
-            .connect_with_connection_string(&connection_string)
-            .map_err(|e| DataStoreError::ConnectionError(e.to_string()))?;
-
-        todo!("figure out how to store environment so that it can outlive connections")
+    async fn connect(&self) -> Result<SnowflakeSession, DataStoreError> {
+        self.client.create_session().await.map_err(|e| {
+            DataStoreError::ConnectionError(format!(
+                "Failed to connect to Snowflake, {}",
+                e.to_string()
+            ))
+        })
     }
 }
 
-impl<'env> DataStoreMapping for SnowflakeDataStore<'env> {
+impl DataStoreMapping for SnowflakeDataStore {
     fn get_dialect(&self) -> &dyn sqlparser::dialect::Dialect {
         &sqlparser::dialect::SnowflakeDialect {}
     }
-
-    // fn map_type(&self, pg_type: &PostgresType) -> Option<String> {
-    //     match pg_type {
-    //         PostgresType::Serial => Some("number(6)".to_string()),
-    //         PostgresType::BigSerial => Some("number(11)".to_string()),
-    //         PostgresType::SmallInt => Some("number(6)".to_string()),
-    //         PostgresType::Integer => Some("number(11)".to_string()),
-    //         PostgresType::BigInt => Some("number(20)".to_string()),
-    //         PostgresType::Numeric => Some("number".to_string()),
-    //         PostgresType::Real | PostgresType::DoublePrecision | PostgresType::Money => {
-    //             Some("float".to_string())
-    //         }
-    //         PostgresType::ByteA => Some("binary".to_string()),
-    //         PostgresType::Varchar
-    //         | PostgresType::Char
-    //         | PostgresType::Text
-    //         | PostgresType::Cidr
-    //         | PostgresType::Inet
-    //         | PostgresType::MacAddr
-    //         | PostgresType::MacAddr8
-    //         | PostgresType::Bit
-    //         | PostgresType::Uuid
-    //         | PostgresType::Xml
-    //         | PostgresType::TsVector
-    //         | PostgresType::TsQuery
-    //         | PostgresType::Interval
-    //         | PostgresType::Point
-    //         | PostgresType::Line
-    //         | PostgresType::LSeg
-    //         | PostgresType::Box
-    //         | PostgresType::Path
-    //         | PostgresType::Polygon
-    //         | PostgresType::Circle
-    //         | PostgresType::Array
-    //         | PostgresType::Composite
-    //         | PostgresType::Range
-    //         | PostgresType::PgLsn
-    //         | PostgresType::Name => Some("text".to_string()),
-    //         PostgresType::Json | PostgresType::Jsonb | PostgresType::Geometry => {
-    //             Some("variant".to_string())
-    //         }
-    //         PostgresType::Timestamp | PostgresType::TimestampTz => {
-    //             Some("timestamp_ntz".to_string())
-    //         }
-    //         PostgresType::Date => Some("date".to_string()),
-    //         PostgresType::Time | PostgresType::TimeTz => Some("time".to_string()),
-    //         PostgresType::Boolean => Some("boolean".to_string()),
-    //         PostgresType::Oid => Some("number(11)".to_string()),
-    //         PostgresType::SLTimestamp => Some("timestamp_tz".to_string()),
-    //     }
-    // }
 
     fn map_function(&self, pg_function: &str) -> Option<String> {
         match pg_function {
@@ -110,10 +86,21 @@ impl<'env> DataStoreMapping for SnowflakeDataStore<'env> {
     }
 }
 
-impl<'env> DataStoreClient for SnowflakeDataStore<'env> {
-    fn execute(&self, query: &str) -> Result<Vec<DataRow>, DataStoreError> {
-        todo!()
+#[async_trait]
+impl DataStoreClient for SnowflakeDataStore {
+    async fn execute(&self, query: &str) -> Result<Vec<Response>, DataStoreError> {
+        // let config = self.config.clone();
+        let session = self.connect().await?;
+
+        let rows = session
+            .query(query)
+            .await
+            .map_err(|e| DataStoreError::QueryError(e.to_string()))?;
+        let data = vec![DataRow::default()];
+
+        todo!("Implement SnowflakeDataStore::execute");
+        // Ok(data)
     }
 }
 
-impl<'env> DataStore for SnowflakeDataStore<'env> {}
+impl DataStore for SnowflakeDataStore {}

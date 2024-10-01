@@ -8,10 +8,10 @@ pub struct Config {
     #[envconfig(from = "SEMANTIC_MODEL_STORE", default = "local")]
     pub semantic_model_store: String,
 
-    #[envconfig(from = "SERVER_HOST")]
+    #[envconfig(from = "SERVER_HOST", default = "127.0.0.1")]
     pub server_host: String,
 
-    #[envconfig(from = "SERVER_PORT")]
+    #[envconfig(from = "SERVER_PORT", default = "5433")]
     pub server_port: u16,
 }
 

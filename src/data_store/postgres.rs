@@ -1,10 +1,12 @@
+use super::DataStore;
 use crate::data_store::{DataStoreClient, DataStoreError, DataStoreMapping};
 use async_trait::async_trait;
-use pgwire::messages::data::DataRow;
+use pgwire::api::{
+    portal::Format,
+    results::{QueryResponse, Response, Tag},
+};
 use sqlparser::dialect::PostgreSqlDialect;
 use tokio_postgres::{Client, NoTls};
-
-use super::DataStore;
 
 pub struct PostgresConfig {
     pub user: String,
@@ -67,29 +69,33 @@ impl DataStoreMapping for PostgresDataStore {
     // }
 }
 
-// #[async_trait]
+use crate::utils::encoding::encode_row_data;
+use crate::utils::encoding::row_desc_from_stmt;
+use std::sync::Arc;
+
+#[async_trait]
 impl DataStoreClient for PostgresDataStore {
-    fn execute(&self, sql: &str) -> Result<Vec<DataRow>, DataStoreError> {
-        // let rows = self.client.query(query, &[]).await.map_err(|e| {
-        //     DataStoreError::QueryError(format!("Error executing query: {}", e))
-        // })?;
+    async fn execute(&self, sql: &str) -> Result<Vec<Response>, DataStoreError> {
+        let rows = self
+            .client
+            .query(sql, &[])
+            .await
+            .map_err(|e| DataStoreError::ColumnNotFound(e.to_string()))?;
 
-        // let mut data_rows = Vec::new();
+        let stmt = self
+            .client
+            .prepare(sql)
+            .await
+            .map_err(|e| DataStoreError::ColumnNotFound(e.to_string()))?;
 
-        // for row in rows {
-        //     let mut data_row = DataRow::new();
-
-        //     // Add columns to data_row (for simplicity, this example assumes all columns are text)
-        //     for (i, column) in row.columns().iter().enumerate() {
-        //         let value: String = row.try_get(i).unwrap_or_default();
-        //         data_row.add_column(value.into_bytes());
-        //     }
-
-        //     data_rows.push(data_row);
-        // }
-
-        // Ok(data_rows)
-        todo!("TODO")
+        let field_info = row_desc_from_stmt(&stmt, &Format::UnifiedText)
+            .map_err(|e| DataStoreError::ColumnNotFound(e.to_string()))?;
+        let field_info_arc = Arc::new(field_info);
+        let data_rows = encode_row_data(rows, field_info_arc.clone());
+        Ok(vec![Response::Query(QueryResponse::new(
+            field_info_arc,
+            Box::pin(data_rows),
+        ))])
     }
 }
 

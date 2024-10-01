@@ -29,14 +29,6 @@ impl LocalSemanticModelStore {
                     aggregation: "COUNT_DISTINCT".to_string(),
                     sql: "count(distinct dm_employees.effective_date)".to_string(),
                 },
-                // Measure {
-                //     name: "'1 day'::interval".to_string(),
-                //     description: "One day interval".to_string(),
-                //     data_type: "INTERVAL".to_string(),
-                //     aggregation: "INTERVAL".to_string(),
-                //     sql: "INTERVAL '1 day'".to_string(),
-                // },
-                // You can add more measures here if needed
             ],
             dimensions: vec![
                 Dimension {
@@ -62,41 +54,6 @@ impl LocalSemanticModelStore {
         };
 
         semantic_models.insert(employees_model.name.clone(), employees_model);
-
-        // // Add some dummy semantic models
-        // // TODO(ethan): add some real models from the examples file
-        // let model1 = SemanticModel {
-        //     name: "table1".to_string(),
-        //     measures: vec![
-        //         Measure {
-        //             name: "measure1".to_string(),
-        //             // ... other measure fields ...
-        //         },
-        //         Measure {
-        //             name: "measure2".to_string(),
-        //             // ... other measure fields ...
-        //         },
-        //     ],
-        //     // ... other semantic model fields ...
-        // };
-
-        // let model2 = SemanticModel {
-        //     name: "table2".to_string(),
-        //     measures: vec![
-        //         Measure {
-        //             name: "measure3".to_string(),
-        //             // ... other measure fields ...
-        //         },
-        //         Measure {
-        //             name: "measure4".to_string(),
-        //             // ... other measure fields ...
-        //         },
-        //     ],
-        //     // ... other semantic model fields ...
-        // };
-
-        // semantic_models.insert(model1.name.clone(), model1);
-        // semantic_models.insert(model2.name.clone(), model2);
 
         LocalSemanticModelStore { semantic_models }
     }

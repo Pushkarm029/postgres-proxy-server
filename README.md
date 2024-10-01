@@ -9,12 +9,12 @@
 
 2. **Create and Populate Databases:**
    ```bash
-   make create-db populate-schema populate-db
+   make create-db populate-db
    ```
 
 3. **Run the PGWire Server:**
    ```bash
-   make run
+   make local-pg-run
    ```
 
 4. **Connect to the Proxy Server:**

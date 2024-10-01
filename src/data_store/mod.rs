@@ -5,23 +5,26 @@ mod snowflake;
 use pgwire::messages::data::DataRow;
 use postgres::PostgresDataStore;
 // use postgres::PostgresType;
+use async_trait::async_trait;
+use pgwire::api::results::Response;
+use pgwire::error::PgWireResult;
 pub use snowflake::SnowflakeConfig;
 pub use snowflake::SnowflakeDataStore;
-
 use std::collections::HashMap;
 use std::fmt;
 
 pub trait DataStore: DataStoreClient + DataStoreMapping + Clone {}
 
 #[derive(Clone)]
-pub enum DataStoreType<'a> {
+pub enum DataStoreType {
     Postgres(PostgresDataStore),
-    Snowflake(SnowflakeDataStore<'a>),
+    Snowflake(SnowflakeDataStore),
 }
 
-impl DataStore for DataStoreType<'_> {}
+#[async_trait]
+impl DataStore for DataStoreType {}
 
-impl DataStoreMapping for DataStoreType<'_> {
+impl DataStoreMapping for DataStoreType {
     fn get_dialect(&self) -> &dyn sqlparser::dialect::Dialect {
         match self {
             DataStoreType::Postgres(pg_store) => pg_store.get_dialect(),
@@ -41,11 +44,12 @@ impl DataStoreMapping for DataStoreType<'_> {
     // }
 }
 
-impl DataStoreClient for DataStoreType<'_> {
-    fn execute(&self, sql: &str) -> Result<Vec<DataRow>, DataStoreError> {
+#[async_trait]
+impl DataStoreClient for DataStoreType {
+    async fn execute(&self, sql: &str) -> Result<Vec<Response>, DataStoreError> {
         match self {
-            DataStoreType::Postgres(pg_store) => pg_store.execute(sql),
-            DataStoreType::Snowflake(snowflake_store) => snowflake_store.execute(sql),
+            DataStoreType::Postgres(pg_store) => pg_store.execute(sql).await,
+            DataStoreType::Snowflake(snowflake_store) => snowflake_store.execute(sql).await,
         }
     }
 }
@@ -70,15 +74,16 @@ pub trait DataStoreMapping {
 
 /// DataStoreClient is responsible for executing queries and returning
 /// results from the DataStore.
+#[async_trait]
 pub trait DataStoreClient {
     /// Execute the SQL query and return the result as [`DataRow`]s.
     ///
     /// The DataStore must internally map the result data into the
     /// pgwire [`DataRow`] type.
-    fn execute(&self, sql: &str) -> Result<Vec<DataRow>, DataStoreError>;
+    async fn execute(&self, sql: &str) -> Result<Vec<Response>, DataStoreError>;
 
     // TODO: Add execute_streaming that returns a stream instead of a vector of data rows
-    // fn execute_streaming(&self, sql: &str) -> Result<Stream<DataRow>, DataStoreError>;
+    // async fn execute_streaming(&self, sql: &str) -> Result<Stream<DataRow>, DataStoreError>;
 }
 
 pub struct Row {
