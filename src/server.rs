@@ -24,7 +24,7 @@ async fn run_tcp_server() {
     let semantic_model_store: SemanticModelType = match config.semantic_model_store.as_str() {
         "local" => {
             info!("Using LocalSemanticModelStore");
-            SemanticModelType::Local(LocalSemanticModelStore::new())
+            SemanticModelType::Local(LocalSemanticModelStore::mock())
         }
         _ => {
             info!("Using S3SemanticModelStore");

@@ -1,14 +1,13 @@
-use crate::semantic_model::store::{SemanticModelStore, SemanticModelStoreError};
-use crate::semantic_model::Dimension;
-use crate::semantic_model::{Measure, SemanticModel};
+use super::{Dimension, Measure, SemanticModel, SemanticModelStore, SemanticModelStoreError};
 use std::collections::HashMap;
-#[derive(Clone)]
+
+#[derive(Clone, Default)]
 pub struct LocalSemanticModelStore {
     semantic_models: HashMap<String, SemanticModel>,
 }
 
 impl LocalSemanticModelStore {
-    pub fn new() -> Self {
+    pub fn mock() -> Self {
         let mut semantic_models = HashMap::new();
         let employees_model = SemanticModel {
             name: "dm_employees".to_string(),

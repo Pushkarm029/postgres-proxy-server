@@ -1,5 +1,4 @@
-use crate::semantic_model::store::{SemanticModelStore, SemanticModelStoreError};
-use crate::semantic_model::{Measure, SemanticModel};
+use super::{Measure, SemanticModel, SemanticModelStore, SemanticModelStoreError};
 use aws_sdk_s3::{config::BehaviorVersion, Client};
 use std::collections::HashMap;
 use std::error::Error;
