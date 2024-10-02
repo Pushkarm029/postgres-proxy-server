@@ -22,19 +22,19 @@ pub enum SqlParserError {
     MeasureFunctionError(String),
 }
 
-pub struct SqlParser<D, S> {
-    data_store: D,
+pub struct SqlParser<M, S> {
+    data_store_mapping: M,
     semantic_model: S,
 }
 
-impl<D, S> SqlParser<D, S>
+impl<M, S> SqlParser<M, S>
 where
-    D: DataStoreMapping,
+    M: DataStoreMapping,
     S: SemanticModelStore,
 {
-    pub fn new(data_store: D, semantic_model: S) -> Self {
+    pub fn new(data_store: M, semantic_model: S) -> Self {
         SqlParser {
-            data_store,
+            data_store_mapping: data_store,
             semantic_model,
         }
     }
@@ -64,7 +64,7 @@ where
                 Statement::Query(mut query) => {
                     transformations::apply_transformations(
                         &mut query,
-                        &self.data_store,
+                        &self.data_store_mapping,
                         &self.semantic_model,
                     )?;
                     Ok(Statement::Query(query))
@@ -84,23 +84,15 @@ where
 #[cfg(test)]
 mod test {
     use super::SqlParser;
-    use crate::data_store::postgres::{PostgresConfig, PostgresDataStore};
+    use crate::data_store::postgres::PostgresMapping;
     use crate::semantic_model::local_store::LocalSemanticModelStore;
     use rstest::*;
 
     #[fixture]
-    async fn sql_parser_fixture() -> SqlParser<PostgresDataStore, LocalSemanticModelStore> {
-        let ds = PostgresDataStore::new(PostgresConfig {
-            host: "localhost:5432".to_string(),
-            user: "postgres".to_string(),
-            password: "postgres".to_string(),
-            dbname: "main".to_string(),
-        })
-        .await
-        .unwrap();
-
+    async fn sql_parser_fixture() -> SqlParser<PostgresMapping, LocalSemanticModelStore> {
+        let mapping = PostgresMapping {};
         let sm = LocalSemanticModelStore::mock();
-        SqlParser::new(ds, sm)
+        SqlParser::new(mapping, sm)
     }
 
     // TODO: CONFUSED?: Do we need this : when AS is not present add measure fetched keyword in AS automatically. for example
@@ -158,7 +150,7 @@ mod test {
     )]
     #[tokio::test]
     async fn test_parser_on_postgres(
-        #[future] sql_parser_fixture: SqlParser<PostgresDataStore, LocalSemanticModelStore>,
+        #[future] sql_parser_fixture: SqlParser<PostgresMapping, LocalSemanticModelStore>,
         #[case] initial_query: &str,
         #[case] expected_query: &str,
     ) {
@@ -170,11 +162,11 @@ mod test {
     #[rstest]
     #[case::test_now_function(
         "SELECT employee_id, name, now() AS now FROM employees WHERE department = 'Sales';",
-        "SELECT employee_id, name, CURRENT_TIMESTAMP AS now FROM employees WHERE department = 'Sales'"
+        "SELECT employee_id, name, now() AS now FROM employees WHERE department = 'Sales'"
     )]
     #[tokio::test]
     async fn test_func_parser_on_postgres(
-        #[future] sql_parser_fixture: SqlParser<PostgresDataStore, LocalSemanticModelStore>,
+        #[future] sql_parser_fixture: SqlParser<PostgresMapping, LocalSemanticModelStore>,
         #[case] initial_query: &str,
         #[case] expected_query: &str,
     ) {
@@ -190,7 +182,7 @@ mod test {
     #[case::conditional_update("UPDATE users SET status = CASE WHEN last_login IS NULL THEN 'Inactive' WHEN last_login < NOW() - INTERVAL '1 YEAR' THEN 'Inactive' ELSE 'Active' END;")]
     #[tokio::test]
     async fn test_reject_modify_function(
-        #[future] sql_parser_fixture: SqlParser<PostgresDataStore, LocalSemanticModelStore>,
+        #[future] sql_parser_fixture: SqlParser<PostgresMapping, LocalSemanticModelStore>,
         #[case] query: &str,
     ) {
         let sql_parser = sql_parser_fixture.await;

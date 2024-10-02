@@ -1,4 +1,4 @@
-use crate::data_store::DataStore;
+use crate::data_store::DataStoreClient;
 use crate::semantic_model::SemanticModelStore;
 use crate::sql_parser::SqlParser;
 use pgwire::api::results::Response;
@@ -12,7 +12,7 @@ pub struct QueryHandler<D, S> {
 
 impl<D, S> QueryHandler<D, S>
 where
-    D: DataStore,
+    D: DataStoreClient,
     S: SemanticModelStore,
 {
     pub fn new(data_store: D, semantic_model: S) -> Self {
@@ -24,7 +24,7 @@ where
 
     pub async fn handle(&self, query: &str) -> PgWireResult<Vec<Response>> {
         // Parse the query using the sql parser
-        let sql = SqlParser::new(self.data_store.clone(), self.semantic_model.clone())
+        let sql = SqlParser::new(D::get_mapping(), self.semantic_model.clone())
             .parse(query)
             .map_err(|e| {
                 PgWireError::UserError(Box::new(ErrorInfo::new(

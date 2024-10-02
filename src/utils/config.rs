@@ -15,8 +15,8 @@ pub struct Config {
     pub server_port: u16,
 }
 
-#[derive(Envconfig)]
-pub struct PostgresDataStoreEnvConfig {
+#[derive(Envconfig, Clone)]
+pub struct PostgresConfig {
     #[envconfig(from = "POSTGRES_USER", default = "postgres")]
     pub user: String,
     #[envconfig(from = "POSTGRES_PASSWORD", default = "postgres")]
@@ -27,32 +27,32 @@ pub struct PostgresDataStoreEnvConfig {
     pub dbname: String,
 }
 
-#[derive(Envconfig)]
-pub struct SnowflakeDataStoreEnvConfig {
+#[derive(Envconfig, Clone)]
+pub struct SnowflakeConfig {
     #[envconfig(from = "SNOWFLAKE_ACCOUNT")]
-    pub snowflake_account: String,
+    pub account: String,
 
     #[envconfig(from = "SNOWFLAKE_USER")]
-    pub snowflake_user: String,
+    pub user: String,
 
     #[envconfig(from = "SNOWFLAKE_PASSWORD")]
-    pub snowflake_password: String,
+    pub password: String,
 
     #[envconfig(from = "SNOWFLAKE_WAREHOUSE")]
-    pub snowflake_warehouse: String,
+    pub warehouse: String,
 
     #[envconfig(from = "SNOWFLAKE_DATABASE")]
-    pub snowflake_database: String,
+    pub database: String,
 
     #[envconfig(from = "SNOWFLAKE_SCHEMA")]
-    pub snowflake_schema: String,
+    pub schema: String,
 }
 
-#[derive(Envconfig)]
-pub struct S3SemanticModelEnvConfig {
+#[derive(Envconfig, Clone)]
+pub struct S3Config {
     #[envconfig(from = "TENANT", default = "tenant1")]
     pub tenant: String,
 
     #[envconfig(from = "S3_BUCKET_NAME")]
-    pub s3_bucket_name: String,
+    pub bucket_name: String,
 }

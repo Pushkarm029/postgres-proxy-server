@@ -4,21 +4,21 @@ use crate::sql_parser::SqlParserError;
 use sqlparser::ast::*;
 use sqlparser::parser::Parser;
 
-pub fn apply_transformations<D, S>(
+pub fn apply_transformations<M, S>(
     query: &mut Query,
-    data_store: &D,
+    data_store_mapping: &M,
     semantic_model: &S,
 ) -> Result<(), SqlParserError>
 where
-    D: DataStoreMapping,
+    M: DataStoreMapping,
     S: SemanticModelStore,
 {
     // First apply the transformations for the body, then each cte recursively
-    apply_set_expression(&mut query.body, data_store, semantic_model)?;
+    apply_set_expression(&mut query.body, data_store_mapping, semantic_model)?;
 
     if let Some(with) = &mut query.with {
         for cte in &mut with.cte_tables {
-            apply_transformations(&mut cte.query, data_store, semantic_model)?;
+            apply_transformations(&mut cte.query, data_store_mapping, semantic_model)?;
         }
     }
 

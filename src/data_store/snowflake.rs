@@ -1,26 +1,17 @@
 use crate::data_store::{DataStoreClient, DataStoreError, DataStoreMapping};
-// use odbc::{odbc_safe::AutocommitOn, safe::Odbc3, Connection, Environment, ResultSetState, Statement};
-use super::DataStore;
+use crate::utils::config::SnowflakeConfig;
 use async_trait::async_trait;
 use pgwire::api::results::Response;
 use pgwire::messages::data::DataRow;
 use snowflake_connector_rs::SnowflakeSession;
 use snowflake_connector_rs::{SnowflakeAuthMethod, SnowflakeClient, SnowflakeClientConfig};
 
-#[derive(Clone)]
-pub struct SnowflakeConfig {
-    pub account: String,
-    pub user: String,
-    pub password: String,
-    pub warehouse: String,
-    pub database: String,
-    pub schema: String,
-}
-
 pub struct SnowflakeDataStore {
     config: SnowflakeConfig,
     client: SnowflakeClient,
 }
+
+pub struct SnowflakeMapping;
 
 // TODO: Fix me
 impl Clone for SnowflakeDataStore {
@@ -72,7 +63,7 @@ impl SnowflakeDataStore {
     }
 }
 
-impl DataStoreMapping for SnowflakeDataStore {
+impl DataStoreMapping for SnowflakeMapping {
     fn get_dialect(&self) -> &dyn sqlparser::dialect::Dialect {
         &sqlparser::dialect::SnowflakeDialect {}
     }
@@ -88,6 +79,12 @@ impl DataStoreMapping for SnowflakeDataStore {
 
 #[async_trait]
 impl DataStoreClient for SnowflakeDataStore {
+    type Mapping = SnowflakeMapping;
+
+    fn get_mapping() -> Self::Mapping {
+        SnowflakeMapping {}
+    }
+
     async fn execute(&self, query: &str) -> Result<Vec<Response>, DataStoreError> {
         // let config = self.config.clone();
         let session = self.connect().await?;
@@ -102,5 +99,3 @@ impl DataStoreClient for SnowflakeDataStore {
         // Ok(data)
     }
 }
-
-impl DataStore for SnowflakeDataStore {}

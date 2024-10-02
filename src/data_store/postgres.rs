@@ -1,24 +1,21 @@
-use super::DataStore;
 use crate::data_store::{DataStoreClient, DataStoreError, DataStoreMapping};
+use crate::utils::config::PostgresConfig;
+use crate::utils::encoding::{encode_row_data, row_desc_from_stmt};
 use async_trait::async_trait;
 use pgwire::api::{
     portal::Format,
     results::{QueryResponse, Response},
 };
 use sqlparser::dialect::PostgreSqlDialect;
+use std::sync::Arc;
 use tokio_postgres::{Client, NoTls};
-
-pub struct PostgresConfig {
-    pub user: String,
-    pub password: String,
-    pub host: String,
-    pub dbname: String,
-}
 
 pub struct PostgresDataStore {
     config: PostgresConfig,
     client: Client,
 }
+
+pub struct PostgresMapping;
 
 impl PostgresDataStore {
     pub async fn new(config: PostgresConfig) -> Result<Self, DataStoreError> {
@@ -51,16 +48,14 @@ impl<'a> Clone for PostgresDataStore {
     }
 }
 
-impl DataStoreMapping for PostgresDataStore {
+impl DataStoreMapping for PostgresMapping {
     fn get_dialect(&self) -> &dyn sqlparser::dialect::Dialect {
         &PostgreSqlDialect {}
     }
 
+    // pass through since input functions are in postgres dialect
     fn map_function(&self, pg_function: &str) -> Option<String> {
-        match pg_function {
-            "now()" => Some("CURRENT_TIMESTAMP".to_string()),
-            _ => Some(pg_function.to_string()),
-        }
+        Some(pg_function.to_string())
     }
 
     // Implement type mapping if necessary
@@ -69,12 +64,14 @@ impl DataStoreMapping for PostgresDataStore {
     // }
 }
 
-use crate::utils::encoding::encode_row_data;
-use crate::utils::encoding::row_desc_from_stmt;
-use std::sync::Arc;
-
 #[async_trait]
 impl DataStoreClient for PostgresDataStore {
+    type Mapping = PostgresMapping;
+
+    fn get_mapping() -> Self::Mapping {
+        PostgresMapping {}
+    }
+
     async fn execute(&self, sql: &str) -> Result<Vec<Response>, DataStoreError> {
         let rows = self
             .client
@@ -98,5 +95,3 @@ impl DataStoreClient for PostgresDataStore {
         ))])
     }
 }
-
-impl DataStore for PostgresDataStore {}

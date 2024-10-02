@@ -1,4 +1,4 @@
-use crate::data_store::DataStore;
+use crate::data_store::DataStoreClient;
 use crate::query_handler::QueryHandler;
 use crate::semantic_model::SemanticModelStore;
 use async_trait::async_trait;
@@ -13,18 +13,14 @@ use pgwire::error::PgWireResult;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-pub struct Processor<D, S>
-where
-    D: DataStore,
-    S: SemanticModelStore,
-{
+pub struct Processor<D, S> {
     query_handler: Arc<Mutex<QueryHandler<D, S>>>,
 }
 
 #[async_trait]
 impl<D, S> SimpleQueryHandler for Processor<D, S>
 where
-    D: DataStore + Send + Sync,
+    D: DataStoreClient + Send + Sync,
     S: SemanticModelStore + Send + Sync,
 {
     async fn do_query<'a, C>(
@@ -40,7 +36,7 @@ where
 
 impl<D, S> Processor<D, S>
 where
-    D: DataStore,
+    D: DataStoreClient,
     S: SemanticModelStore,
 {
     pub fn new(data_store: D, semantic_model: S) -> Self {
@@ -50,17 +46,13 @@ where
     }
 }
 
-pub struct ProcessorFactory<D, S>
-where
-    D: DataStore,
-    S: SemanticModelStore,
-{
+pub struct ProcessorFactory<D, S> {
     handler: Arc<Processor<D, S>>,
 }
 
 impl<D, S> ProcessorFactory<D, S>
 where
-    D: DataStore,
+    D: DataStoreClient,
     S: SemanticModelStore,
 {
     pub fn new(data_store: D, semantic_model: S) -> Self {
@@ -72,7 +64,7 @@ where
 
 impl<D, S> PgWireHandlerFactory for ProcessorFactory<D, S>
 where
-    D: DataStore + Send + Sync,
+    D: DataStoreClient + Send + Sync,
     S: SemanticModelStore + Send + Sync,
 {
     type StartupHandler = NoopStartupHandler;

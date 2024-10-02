@@ -1,3 +1,5 @@
+use crate::utils::config::S3Config;
+
 use super::{Measure, SemanticModel, SemanticModelStore, SemanticModelStoreError};
 use aws_sdk_s3::{config::BehaviorVersion, Client};
 use std::collections::HashMap;
@@ -12,7 +14,11 @@ pub struct S3SemanticModelStore {
 }
 
 impl S3SemanticModelStore {
-    pub async fn new(tenant: String, bucket_name: String) -> Self {
+    pub async fn new(config: S3Config) -> Self {
+        let S3Config {
+            tenant,
+            bucket_name,
+        } = config;
         let shared_config = aws_config::load_defaults(BehaviorVersion::latest()).await;
         let s3_client = Client::new(&shared_config);
         S3SemanticModelStore {
