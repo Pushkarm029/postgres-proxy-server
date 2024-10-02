@@ -40,8 +40,7 @@ async fn test_get_semantic_model() {
     {
         "name": "model1",
         "label": "Model 1",
-        "description": "Test model",
-        "measures": [
+        "description": "Test model",>[
             {
                 "name": "count",
                 "description": "Count of records",

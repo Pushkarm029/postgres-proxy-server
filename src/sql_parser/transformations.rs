@@ -1,24 +1,24 @@
-use crate::data_store::DataStore;
+use crate::data_store::DataStoreMapping;
 use crate::semantic_model::SemanticModelStore;
 use crate::sql_parser::SqlParserError;
 use sqlparser::ast::*;
 use sqlparser::parser::Parser;
 
-pub fn apply_transformations<D, S>(
+pub fn apply_transformations<M, S>(
     query: &mut Query,
-    data_store: &D,
+    data_store_mapping: &M,
     semantic_model: &S,
 ) -> Result<(), SqlParserError>
 where
-    D: DataStore,
+    M: DataStoreMapping,
     S: SemanticModelStore,
 {
     // First apply the transformations for the body, then each cte recursively
-    apply_set_expression(&mut query.body, data_store, semantic_model)?;
+    apply_set_expression(&mut query.body, data_store_mapping, semantic_model)?;
 
     if let Some(with) = &mut query.with {
         for cte in &mut with.cte_tables {
-            apply_transformations(&mut cte.query, data_store, semantic_model)?;
+            apply_transformations(&mut cte.query, data_store_mapping, semantic_model)?;
         }
     }
 
@@ -31,7 +31,7 @@ fn apply_set_expression<D, S>(
     semantic_model: &S,
 ) -> Result<(), SqlParserError>
 where
-    D: DataStore,
+    D: DataStoreMapping,
     S: SemanticModelStore,
 {
     match set_expr {
@@ -76,25 +76,33 @@ fn rewrite_expression<D, S>(
     semantic_model: &S,
 ) -> Result<(), SqlParserError>
 where
-    D: DataStore,
+    D: DataStoreMapping,
     S: SemanticModelStore,
 {
-    *expr = match std::mem::replace(expr, Expr::Value(Value::Null)) {
-        Expr::Function(mut func) => {
-            if func.name.to_string().to_uppercase() == "MEASURE" {
-                rewrite_measure(&mut func, data_store, semantic_model)?;
+    let new_expr = match expr {
+        Expr::Function(func) => {
+            let mut new_func = func.clone();
+            if new_func.name.to_string().to_uppercase() == "MEASURE" {
+                rewrite_measure(&mut new_func, data_store, semantic_model)?;
             } else {
                 // Apply data_store-specific function mappings
-                // if let Some(mapped_func) = data_store.map_function(func.name.to_string().as_str()) {
-                //     func.name = ObjectName(vec![Ident::new(mapped_func)]);
-                // }
+                if let Some(mapped_func) = data_store.map_function(func.to_string().as_str()) {
+                    new_func = Function {
+                        name: ObjectName(vec![Ident::new(mapped_func)]),
+                        args: FunctionArguments::None,
+                        over: None,
+                        parameters: FunctionArguments::None,
+                        filter: None,
+                        null_treatment: None,
+                        within_group: vec![],
+                    };
+                }
             }
-
-            Expr::Function(func)
+            Expr::Function(new_func)
         }
         Expr::BinaryOp { left, right, op } => {
-            let mut new_left = *left;
-            let mut new_right = *right;
+            let mut new_left = left.as_ref().clone();
+            let mut new_right = right.as_ref().clone();
             rewrite_expression(&mut new_left, data_store, semantic_model)?;
             rewrite_expression(&mut new_right, data_store, semantic_model)?;
             Expr::BinaryOp {
@@ -103,15 +111,18 @@ where
                 op: op.clone(),
             }
         }
-        Expr::Exists {
-            mut subquery,
-            negated,
-        } => {
-            apply_transformations(&mut subquery, data_store, semantic_model)?;
-            Expr::Exists { negated, subquery }
+        Expr::Exists { subquery, negated } => {
+            let mut new_subquery = subquery.as_ref().clone();
+            apply_transformations(&mut new_subquery, data_store, semantic_model)?;
+            Expr::Exists {
+                subquery: Box::new(new_subquery),
+                negated: *negated,
+            }
         }
         _ => expr.clone(),
     };
+
+    *expr = new_expr;
     Ok(())
 }
 
@@ -132,7 +143,7 @@ fn rewrite_measure<D, S>(
     semantic_model: &S,
 ) -> Result<Expr, SqlParserError>
 where
-    D: DataStore,
+    D: DataStoreMapping,
     S: SemanticModelStore,
 {
     let args = match &func.args {
@@ -150,7 +161,10 @@ where
         ));
     }
 
+    println!("ident: {:?}", args);
+
     let ident = match &args.args[0] {
+        // TODO: needs fix, it is not accessary to have table name with keyword everytime.
         FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::CompoundIdentifier(ident))) => ident,
         _ => {
             return Err(SqlParserError::MeasureFunctionError(
@@ -195,6 +209,16 @@ where
                 "MEASURE function expects a single function expression".to_string(),
             ))
         }
+    };
+
+    *func = Function {
+        name: ObjectName(vec![Ident::new(expr.to_string())]),
+        args: FunctionArguments::None,
+        over: None,
+        parameters: FunctionArguments::None,
+        filter: None,
+        null_treatment: None,
+        within_group: vec![],
     };
 
     Ok(expr)

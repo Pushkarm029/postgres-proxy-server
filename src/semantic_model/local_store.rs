@@ -1,50 +1,62 @@
-use crate::semantic_model::store::{SemanticModelStore, SemanticModelStoreError};
-use crate::semantic_model::{Measure, SemanticModel};
+use super::{Dimension, Measure, SemanticModel, SemanticModelStore, SemanticModelStoreError};
 use std::collections::HashMap;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct LocalSemanticModelStore {
     semantic_models: HashMap<String, SemanticModel>,
 }
 
 impl LocalSemanticModelStore {
-    pub fn new() -> Self {
+    pub fn mock() -> Self {
         let mut semantic_models = HashMap::new();
+        let employees_model = SemanticModel {
+            name: "dm_employees".to_string(),
+            label: "Employees".to_string(),
+            description: "Dimensional model for employee data".to_string(),
+            measures: vec![
+                Measure {
+                    name: "headcount".to_string(),
+                    description: "Count of distinct employees included in headcount".to_string(),
+                    data_type: "INTEGER".to_string(),
+                    aggregation: "COUNT_DISTINCT".to_string(),
+                    // sql: "COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END)".to_string(),
+                    // Use simpler re-write for easier to read test cases
+                    sql: "COUNT(dm_employees.id)".to_string(),
+                },
+                Measure {
+                    name: "ending_headcount".to_string(),
+                    description: "Count of distinct effective dates for employees".to_string(),
+                    data_type: "INTEGER".to_string(),
+                    aggregation: "COUNT_DISTINCT".to_string(),
+                    sql: "count(distinct dm_employees.effective_date)".to_string(),
+                },
+            ],
+            dimensions: vec![
+                Dimension {
+                    name: "department_level_1".to_string(),
+                    description: "Top level department of the employee".to_string(),
+                    data_type: "STRING".to_string(),
+                    is_primary_key: false,
+                },
+                Dimension {
+                    name: "id".to_string(),
+                    description: "Unique identifier for the employee".to_string(),
+                    data_type: "INTEGER".to_string(),
+                    is_primary_key: true,
+                },
+                Dimension {
+                    name: "included_in_headcount".to_string(),
+                    description:
+                        "Flag indicating if the employee is included in headcount calculations"
+                            .to_string(),
+                    data_type: "BOOLEAN".to_string(),
+                    is_primary_key: false,
+                },
+                // You can add more dimensions here if needed
+            ],
+        };
 
-        // // Add some dummy semantic models
-        // // TODO(ethan): add some real models from the examples file
-        // let model1 = SemanticModel {
-        //     name: "table1".to_string(),
-        //     measures: vec![
-        //         Measure {
-        //             name: "measure1".to_string(),
-        //             // ... other measure fields ...
-        //         },
-        //         Measure {
-        //             name: "measure2".to_string(),
-        //             // ... other measure fields ...
-        //         },
-        //     ],
-        //     // ... other semantic model fields ...
-        // };
-
-        // let model2 = SemanticModel {
-        //     name: "table2".to_string(),
-        //     measures: vec![
-        //         Measure {
-        //             name: "measure3".to_string(),
-        //             // ... other measure fields ...
-        //         },
-        //         Measure {
-        //             name: "measure4".to_string(),
-        //             // ... other measure fields ...
-        //         },
-        //     ],
-        //     // ... other semantic model fields ...
-        // };
-
-        // semantic_models.insert(model1.name.clone(), model1);
-        // semantic_models.insert(model2.name.clone(), model2);
+        semantic_models.insert(employees_model.name.clone(), employees_model);
 
         LocalSemanticModelStore { semantic_models }
     }
@@ -69,7 +81,13 @@ impl SemanticModelStore for LocalSemanticModelStore {
         table_name: &str,
         measure_name: &str,
     ) -> Result<Measure, SemanticModelStoreError> {
-        // ... implementation similar to S3SemanticModelStore ...
-        todo!()
+        let semantic_model = self.get_semantic_model(table_name)?;
+
+        semantic_model
+            .measures
+            .iter()
+            .find(|measure| measure.name == measure_name)
+            .cloned()
+            .ok_or(SemanticModelStoreError::MeasureNotFound)
     }
 }

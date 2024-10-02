@@ -1,44 +1,53 @@
 CARGO = cargo
 PSQL = psql
 DB_NAME = main
-SCHEMA_DB_NAME = information_schema
 DB_USER = postgres
 DB_PASSWORD = postgres
 DB_HOST = localhost
 DB_PORT = 5432
-
-test: 	
-	@echo "Running tests..."
-	@DATA_DB_CONN_STRING="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/test_db" \
-	SCHEMA_DB_CONN_STRING="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/test_schema" \
-	SCHEMA_TABLE_NAME="measures" \
+# Section: Postgres & Local
+local-pg-test: 
+	@echo "Running tests with Postgres and local storage..."
 	RUST_LOG=trace \
 	$(CARGO) test
 
-temp-test: 	
-	@echo "Running tests..."
-	@DATA_DB_CONN_STRING="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)" \
-	SCHEMA_DB_CONN_STRING="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(SCHEMA_DB_NAME)" \
-	SCHEMA_TABLE_NAME="measures" \
+local-pg-run:
+	@echo "Running in production mode with Postgres and local storage..."
+	RUST_LOG=info \
+	$(CARGO) run
+
+# Section: S3 & Snowflake
+s3-snowflake-test:
+	@echo "Running tests with S3 and Snowflake..."
+	@DATA_STORE="snowflake" \
+	SEMANTIC_MODEL_STORE="s3" \
+	SNOWFLAKE_ACCOUNT="$(SNOWFLAKE_ACCOUNT)" \
+	SNOWFLAKE_USER="$(SNOWFLAKE_USER)" \
+	SNOWFLAKE_PASSWORD="$(SNOWFLAKE_PASSWORD)" \
+	SNOWFLAKE_WAREHOUSE="$(SNOWFLAKE_WAREHOUSE)" \
+	SNOWFLAKE_DATABASE="$(SNOWFLAKE_DATABASE)" \
+	SNOWFLAKE_SCHEMA="$(SNOWFLAKE_SCHEMA)" \
+	TENANT="$(TENANT)" \
+	S3_BUCKET_NAME="$(S3_BUCKET_NAME)" \
 	RUST_LOG=trace \
 	$(CARGO) test
 
-run: 	
-	@echo "Running in prod mode..."
-	@DATA_DB_CONN_STRING="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)" \
-	SCHEMA_DB_CONN_STRING="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(SCHEMA_DB_NAME)" \
-	SCHEMA_TABLE_NAME="measures" \
+s3-snowflake-run:
+	@echo "Running in production mode with S3 and Snowflake..."
+	@DATA_STORE="snowflake" \
+	SEMANTIC_MODEL_STORE="s3" \
+	SNOWFLAKE_ACCOUNT="$(SNOWFLAKE_ACCOUNT)" \
+	SNOWFLAKE_USER="$(SNOWFLAKE_USER)" \
+	SNOWFLAKE_PASSWORD="$(SNOWFLAKE_PASSWORD)" \
+	SNOWFLAKE_WAREHOUSE="$(SNOWFLAKE_WAREHOUSE)" \
+	SNOWFLAKE_DATABASE="$(SNOWFLAKE_DATABASE)" \
+	SNOWFLAKE_SCHEMA="$(SNOWFLAKE_SCHEMA)" \
+	TENANT="$(TENANT)" \
+	S3_BUCKET_NAME="$(S3_BUCKET_NAME)" \
 	RUST_LOG=info \
 	$(CARGO) run
 
-debug-run: 	
-	@echo "Running in debug mode..."
-	@DATA_DB_CONN_STRING="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/test_db" \
-	SCHEMA_DB_CONN_STRING="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/test_schema" \
-	SCHEMA_TABLE_NAME="measures" \
-	RUST_LOG=info \
-	$(CARGO) run
-
+# Shared commands for both configurations
 setup-db:
 	@echo "Starting Postgres container..."
 	@docker run --name postgres -e POSTGRES_PASSWORD=$(DB_PASSWORD) -p $(DB_PORT):$(DB_PORT) -d postgres
@@ -48,15 +57,10 @@ setup-db:
 create-db:
 	@echo "Creating databases $(DB_NAME) and $(SCHEMA_DB_NAME)..."
 	@$(PSQL) postgres://$(DB_USER):$(DB_PASSWORD)@127.0.0.1:$(DB_PORT) -c "CREATE DATABASE $(DB_NAME)"
-	@$(PSQL) postgres://$(DB_USER):$(DB_PASSWORD)@127.0.0.1:$(DB_PORT) -c "CREATE DATABASE $(SCHEMA_DB_NAME)"
 
 populate-db:
 	@echo "Populating main database..."
 	@$(PSQL) postgres://$(DB_USER):$(DB_PASSWORD)@127.0.0.1:$(DB_PORT)/$(DB_NAME) -f ./scripts/populate_db.sql
-
-populate-schema:
-	@echo "Populating schema database..."
-	@$(PSQL) postgres://$(DB_USER):$(DB_PASSWORD)@127.0.0.1:$(DB_PORT)/$(SCHEMA_DB_NAME) -f ./scripts/populate_schema.sql
 
 teardown:
 	@echo "Stopping and removing containers..."
@@ -69,4 +73,4 @@ clean:
 	@docker rm postgres
 	@rm -rf target
 
-.PHONY: run test setup teardown run-proxy populate-db populate-schema clean temp-test
+.PHONY: local-pg-test local-pg-run s3-snowflake-test s3-snowflake-run setup-db create-db populate-db populate-schema teardown clean

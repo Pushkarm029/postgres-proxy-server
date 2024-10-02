@@ -1,6 +1,5 @@
-use crate::data_store::{DataStore, TodoDummyDataStore};
+use crate::data_store::DataStoreClient;
 use crate::query_handler::QueryHandler;
-use crate::semantic_model::local_store::LocalSemanticModelStore;
 use crate::semantic_model::SemanticModelStore;
 use async_trait::async_trait;
 use pgwire::api::results::Response;
@@ -14,12 +13,16 @@ use pgwire::error::PgWireResult;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-pub struct Processor {
-    query_handler: Arc<Mutex<QueryHandler<TodoDummyDataStore, LocalSemanticModelStore>>>,
+pub struct Processor<D, S> {
+    query_handler: Arc<Mutex<QueryHandler<D, S>>>,
 }
 
 #[async_trait]
-impl SimpleQueryHandler for Processor {
+impl<D, S> SimpleQueryHandler for Processor<D, S>
+where
+    D: DataStoreClient + Send + Sync,
+    S: SemanticModelStore + Send + Sync,
+{
     async fn do_query<'a, C>(
         &self,
         _client: &mut C,
@@ -31,33 +34,41 @@ impl SimpleQueryHandler for Processor {
     }
 }
 
-impl Processor {
-    // TODO: Support generic query handler
-    pub async fn new() -> Self {
+impl<D, S> Processor<D, S>
+where
+    D: DataStoreClient,
+    S: SemanticModelStore,
+{
+    pub fn new(data_store: D, semantic_model: S) -> Self {
         Self {
-            query_handler: Arc::new(Mutex::new(QueryHandler::new(
-                TodoDummyDataStore {},
-                LocalSemanticModelStore::new(),
-            ))),
+            query_handler: Arc::new(Mutex::new(QueryHandler::new(data_store, semantic_model))),
         }
     }
 }
 
-pub struct ProcessorFactory {
-    handler: Arc<Processor>,
+pub struct ProcessorFactory<D, S> {
+    handler: Arc<Processor<D, S>>,
 }
 
-impl ProcessorFactory {
-    pub async fn new() -> Self {
+impl<D, S> ProcessorFactory<D, S>
+where
+    D: DataStoreClient,
+    S: SemanticModelStore,
+{
+    pub fn new(data_store: D, semantic_model: S) -> Self {
         Self {
-            handler: Arc::new(Processor::new().await),
+            handler: Arc::new(Processor::new(data_store, semantic_model)),
         }
     }
 }
 
-impl<'a> PgWireHandlerFactory for ProcessorFactory {
+impl<D, S> PgWireHandlerFactory for ProcessorFactory<D, S>
+where
+    D: DataStoreClient + Send + Sync,
+    S: SemanticModelStore + Send + Sync,
+{
     type StartupHandler = NoopStartupHandler;
-    type SimpleQueryHandler = Processor;
+    type SimpleQueryHandler = Processor<D, S>;
     type ExtendedQueryHandler = PlaceholderExtendedQueryHandler;
     type CopyHandler = NoopCopyHandler;
 

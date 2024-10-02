@@ -1,88 +1,80 @@
-use crate::data_store::{SnowflakeConfig, SnowflakeDataStore};
+use crate::data_store::postgres::PostgresDataStore;
+use crate::data_store::DataStoreClient;
 use crate::processor::ProcessorFactory;
-use crate::semantic_model::S3SemanticModelStore;
+use crate::semantic_model::local_store::LocalSemanticModelStore;
+use crate::semantic_model::SemanticModelStore;
+use crate::utils::config::{Config, PostgresConfig};
 use envconfig::Envconfig;
 use log::{error, info};
 use std::sync::Arc;
 use tokio::net::TcpListener;
 
-#[derive(Envconfig)]
-struct Config {
-    #[envconfig(from = "SERVER_HOST")]
-    server_host: String,
-
-    #[envconfig(from = "SERVER_PORT")]
-    server_port: u16,
-
-    #[envconfig(from = "SNOWFLAKE_ACCOUNT")]
-    snowflake_account: String,
-
-    #[envconfig(from = "SNOWFLAKE_USER")]
-    snowflake_user: String,
-
-    #[envconfig(from = "SNOWFLAKE_PASSWORD")]
-    snowflake_password: String,
-
-    #[envconfig(from = "SNOWFLAKE_WAREHOUSE")]
-    snowflake_warehouse: String,
-
-    #[envconfig(from = "SNOWFLAKE_DATABASE")]
-    snowflake_database: String,
-
-    #[envconfig(from = "S3_BUCKET_NAME")]
-    s3_bucket_name: String,
+struct ProxyServer<D, S> {
+    config: Config,
+    factory: Arc<ProcessorFactory<D, S>>,
 }
 
-async fn run_tcp_server() {
-    env_logger::init();
-
-    let temp_tenant_id_for_testing = "tenant1";
-    let config = Config::init_from_env().unwrap();
-    // let semantic_model = S3SemanticModelStore::new(
-    //     temp_tenant_id_for_testing.to_string(),
-    //     config.s3_bucket_name,
-    // );
-
-    // let semantic_model = semantic_model.await;
-    // let snowflake_config = SnowflakeConfig {
-    //     account: config.snowflake_account.clone(),
-    //     user: config.snowflake_user.clone(),
-    //     password: config.snowflake_password.clone(),
-    //     warehouse: config.snowflake_warehouse.clone(),
-    //     database: config.snowflake_database.clone(),
-    //     schema: temp_tenant_id_for_testing.to_string(),
-    // };
-    // let data_store = SnowflakeDataStore::new(snowflake_config).unwrap_or_else(|err| {
-    //     error!("Failed to create Snowflake dialect: {}", err);
-    //     std::process::exit(1);
-    // });
-
-    let factory = Arc::new(ProcessorFactory::new().await);
-    let server_address = format!("{}:{}", config.server_host, config.server_port);
-
-    info!("Starting server at {}", server_address);
-
-    let listener = TcpListener::bind(server_address.clone())
-        .await
-        .unwrap_or_else(|err| {
-            error!("Failed to bind server address: {}", err);
-            std::process::exit(1);
-        });
-
-    info!("Listening for connections on {}", server_address);
-
-    loop {
-        match listener.accept().await {
-            Ok((tcp_stream, addr)) => {
-                info!("New connection accepted from: {}", addr);
-
-                let factory_ref = factory.clone();
-                tokio::spawn(async move {
-                    pgwire::tokio::process_socket(tcp_stream, None, factory_ref).await
-                });
+impl ProxyServer<PostgresDataStore, LocalSemanticModelStore> {
+    pub async fn with_config(config: Config) -> Self {
+        info!("Using PostgresDataStore");
+        let postgres_config = PostgresConfig::init_from_env()
+            .map_err(|e| {
+                error!("Failed to initialize config for Postgres DataStore: {}", e);
+                e
+            })
+            .unwrap();
+        let data_store = PostgresDataStore::new(postgres_config)
+            .await
+            .map_err(|e| {
+                error!("Failed to create Postgres DataStore: {}", e);
+                e
+            })
+            .unwrap();
+        let semantic_model_store = match config.semantic_model_store.as_str() {
+            "local" => {
+                info!("Using LocalSemanticModelStore");
+                LocalSemanticModelStore::mock()
             }
-            Err(e) => {
-                error!("Failed to accept connection: {}", e);
+            val => panic!("Incorrect semantic model type: {}", val),
+        };
+
+        Self {
+            config,
+            factory: Arc::new(ProcessorFactory::new(data_store, semantic_model_store)),
+        }
+    }
+}
+
+impl<D, S> ProxyServer<D, S>
+where
+    D: DataStoreClient + Send + Sync + 'static,
+    S: SemanticModelStore + Send + Sync + 'static,
+{
+    pub async fn run(&self) {
+        let server_address = format!("{}:{}", self.config.server_host, self.config.server_port);
+        info!("Starting server at {}", server_address);
+
+        let listener = TcpListener::bind(server_address.clone())
+            .await
+            .unwrap_or_else(|err| {
+                error!("Failed to bind server address: {}", err);
+                std::process::exit(1);
+            });
+        info!("Listening for connections on {}", server_address);
+
+        loop {
+            match listener.accept().await {
+                Ok((tcp_stream, addr)) => {
+                    info!("New connection accepted from: {}", addr);
+
+                    let factory_ref = self.factory.clone();
+                    tokio::spawn(async move {
+                        pgwire::tokio::process_socket(tcp_stream, None, factory_ref).await
+                    });
+                }
+                Err(e) => {
+                    error!("Failed to accept connection: {}", e);
+                }
             }
         }
     }
@@ -90,5 +82,13 @@ async fn run_tcp_server() {
 
 #[tokio::main]
 pub async fn main() {
-    run_tcp_server().await;
+    env_logger::init();
+    let config = Config::init_from_env()
+        .map_err(|e| {
+            error!("Failed to initialize config: {}", e);
+            e
+        })
+        .unwrap();
+    let server = ProxyServer::with_config(config).await;
+    server.run().await;
 }
