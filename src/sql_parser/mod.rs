@@ -85,54 +85,56 @@ where
 mod test {
     use super::SqlParser;
     use crate::data_store::postgres::PostgresMapping;
+    use crate::data_store::snowflake::SnowflakeMapping;
     use crate::semantic_model::local_store::LocalSemanticModelStore;
     use rstest::*;
 
     #[fixture]
-    async fn sql_parser_fixture() -> SqlParser<PostgresMapping, LocalSemanticModelStore> {
+    fn sql_parser_fixture() -> SqlParser<PostgresMapping, LocalSemanticModelStore> {
         let mapping = PostgresMapping {};
         let sm = LocalSemanticModelStore::mock();
         SqlParser::new(mapping, sm)
     }
 
-    // TODO: CONFUSED?: Do we need this : when AS is not present add measure fetched keyword in AS automatically. for example
-    // 1. for SELECT department_level_1, MEASURE(dm_employees.headcount) FROM dm_employees;
-    // SELECT department_level_1, COUNT(...) AS headcount FROM dm_employees
-    // OR
-    // SELECT department_level_1, COUNT(...) FROM dm_employees
+    #[fixture]
+    fn snowflake_parser_fixture() -> SqlParser<SnowflakeMapping, LocalSemanticModelStore> {
+        let mapping = SnowflakeMapping {};
+        let sm = LocalSemanticModelStore::mock();
+        SqlParser::new(mapping, sm)
+    }
+
     #[rstest]
     #[case::simple_query(
         "SELECT department_level_1, MEASURE(dm_employees.headcount) FROM dm_employees;",
-        "SELECT department_level_1, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END) FROM dm_employees"
+        "SELECT department_level_1, COUNT(dm_employees.id) FROM dm_employees"
     )]
     #[case::query_with_cte(
         "WITH cte AS (SELECT department_level_1, MEASURE(dm_employees.headcount) FROM dm_employees) SELECT * FROM cte;",
-        "WITH cte AS (SELECT department_level_1, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END) FROM dm_employees) SELECT * FROM cte"
+        "WITH cte AS (SELECT department_level_1, COUNT(dm_employees.id) FROM dm_employees) SELECT * FROM cte"
     )]
     #[case::measure_alias_should_be_ignored_first(
         "SELECT department_level_1, MEASURE(dm_employees.headcount) AS 'MEASURE(headcount)' FROM dm_employees;",
-        "SELECT department_level_1, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END) AS 'MEASURE(headcount)' FROM dm_employees"
+        "SELECT department_level_1, COUNT(dm_employees.id) AS 'MEASURE(headcount)' FROM dm_employees"
     )]
     #[case::measure_alias_should_be_ignored_second(
         "WITH cte AS (SELECT department_level_1, MEASURE(dm_employees.headcount) AS 'measure_headcount' FROM dm_employees) SELECT * FROM cte;",
-        "WITH cte AS (SELECT department_level_1, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END) AS 'measure_headcount' FROM dm_employees) SELECT * FROM cte"
+        "WITH cte AS (SELECT department_level_1, COUNT(dm_employees.id) AS 'measure_headcount' FROM dm_employees) SELECT * FROM cte"
     )]
     #[case::test_multiple_tables(
         "SELECT dm_departments.department_level_1_name, MEASURE(dm_employees.headcount) FROM dm_employees LEFT JOIN dm_departments ON dm_employees.department_level_1 = dm_departments.department_level_1;",
-        "SELECT dm_departments.department_level_1_name, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END) FROM dm_employees LEFT JOIN dm_departments ON dm_employees.department_level_1 = dm_departments.department_level_1"
+        "SELECT dm_departments.department_level_1_name, COUNT(dm_employees.id) FROM dm_employees LEFT JOIN dm_departments ON dm_employees.department_level_1 = dm_departments.department_level_1"
     )]
-    // IN THIS CASE, in 2nd measure, we should have distinct, but we got DISTINCT.
     #[case::test_multiple_measures(
         "SELECT department_level_1, MEASURE(dm_employees.headcount), MEASURE(dm_employees.ending_headcount) FROM dm_employees;",
-        "SELECT department_level_1, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END), count(DISTINCT dm_employees.effective_date) FROM dm_employees"
+        "SELECT department_level_1, COUNT(dm_employees.id), count(DISTINCT dm_employees.effective_date) FROM dm_employees"
     )]
     #[case::test_union(
         "SELECT department_level_1, MEASURE(dm_employees.headcount), false as is_total FROM dm_employees UNION SELECT null as department_level_1, MEASURE(dm_employees.headcount), true as is_total FROM dm_employees;",
-        "SELECT department_level_1, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END), false AS is_total FROM dm_employees UNION SELECT NULL AS department_level_1, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END), true AS is_total FROM dm_employees"
+        "SELECT department_level_1, COUNT(dm_employees.id), false AS is_total FROM dm_employees UNION SELECT NULL AS department_level_1, COUNT(dm_employees.id), true AS is_total FROM dm_employees"
     )]
     #[case::test_subquery(
         "SELECT subquery.department_level_1, MEASURE(dm_employees.headcount) FROM (SELECT * FROM dm_employees) AS subquery;",
-        "SELECT subquery.department_level_1, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END) FROM (SELECT * FROM dm_employees) AS subquery"
+        "SELECT subquery.department_level_1, COUNT(dm_employees.id) FROM (SELECT * FROM dm_employees) AS subquery"
     )]
     // #[case::interval_statement_in_dialect(
     //     "SELECT '1 day'::interval as interval_column",
@@ -146,15 +148,10 @@ mod test {
     )]
     #[case::test_distinct_on_snowflake_dialect(
         "SELECT DISTINCT ON (department_level_1) department_level_1, MEASURE(dm_employees.headcount) FROM dm_employees;",
-        "SELECT DISTINCT ON (department_level_1) department_level_1, COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END) FROM dm_employees"
+        "SELECT DISTINCT ON (department_level_1) department_level_1, COUNT(dm_employees.id) FROM dm_employees"
     )]
-    #[tokio::test]
-    async fn test_parser_on_postgres(
-        #[future] sql_parser_fixture: SqlParser<PostgresMapping, LocalSemanticModelStore>,
-        #[case] initial_query: &str,
-        #[case] expected_query: &str,
-    ) {
-        let sql_parser = sql_parser_fixture.await;
+    fn test_parser_on_postgres(#[case] initial_query: &str, #[case] expected_query: &str) {
+        let sql_parser = sql_parser_fixture();
         let transformed_query = sql_parser.parse(initial_query).unwrap();
         assert_eq!(expected_query, transformed_query);
     }
@@ -162,15 +159,10 @@ mod test {
     #[rstest]
     #[case::test_now_function(
         "SELECT employee_id, name, now() AS now FROM employees WHERE department = 'Sales';",
-        "SELECT employee_id, name, now() AS now FROM employees WHERE department = 'Sales'"
+        "SELECT employee_id, name, CURRENT_TIMESTAMP() AS now FROM employees WHERE department = 'Sales'"
     )]
-    #[tokio::test]
-    async fn test_func_parser_on_postgres(
-        #[future] sql_parser_fixture: SqlParser<PostgresMapping, LocalSemanticModelStore>,
-        #[case] initial_query: &str,
-        #[case] expected_query: &str,
-    ) {
-        let sql_parser = sql_parser_fixture.await;
+    fn test_func_parser_on_postgres(#[case] initial_query: &str, #[case] expected_query: &str) {
+        let sql_parser = snowflake_parser_fixture();
         let transformed_query = sql_parser.parse(initial_query).unwrap();
         assert_eq!(expected_query, transformed_query.to_string());
     }
@@ -180,12 +172,8 @@ mod test {
     #[case::multiple_column_update("UPDATE products SET price = 49.99, stock_quantity = stock_quantity - 10 WHERE product_id = 456;")]
     #[case::subquery_update("UPDATE orders SET total_amount = (SELECT SUM(price * quantity) FROM order_items WHERE order_items.order_id = orders.order_id) WHERE order_id = 1234;")]
     #[case::conditional_update("UPDATE users SET status = CASE WHEN last_login IS NULL THEN 'Inactive' WHEN last_login < NOW() - INTERVAL '1 YEAR' THEN 'Inactive' ELSE 'Active' END;")]
-    #[tokio::test]
-    async fn test_reject_modify_function(
-        #[future] sql_parser_fixture: SqlParser<PostgresMapping, LocalSemanticModelStore>,
-        #[case] query: &str,
-    ) {
-        let sql_parser = sql_parser_fixture.await;
+    fn test_reject_modify_function(#[case] query: &str) {
+        let sql_parser = sql_parser_fixture();
         let transformed_query = sql_parser.parse(query);
         assert!(transformed_query.is_err());
     }

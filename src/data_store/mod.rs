@@ -1,5 +1,5 @@
 pub mod postgres;
-mod snowflake;
+pub mod snowflake;
 
 use async_trait::async_trait;
 use pgwire::api::results::Response;
