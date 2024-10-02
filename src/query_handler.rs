@@ -3,10 +3,8 @@ use crate::semantic_model::SemanticModelStore;
 use crate::sql_parser::SqlParser;
 use pgwire::api::results::Response;
 use pgwire::error::PgWireResult;
-use pgwire::{
-    error::{ErrorInfo, PgWireError},
-    messages::data::DataRow,
-};
+use pgwire::error::{ErrorInfo, PgWireError};
+
 pub struct QueryHandler<D, S> {
     data_store: D,
     semantic_model: S,

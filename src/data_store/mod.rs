@@ -2,12 +2,10 @@ pub mod postgres;
 mod snowflake;
 
 // use pgwire::messages::data;
-use pgwire::messages::data::DataRow;
 use postgres::PostgresDataStore;
 // use postgres::PostgresType;
 use async_trait::async_trait;
 use pgwire::api::results::Response;
-use pgwire::error::PgWireResult;
 pub use snowflake::SnowflakeConfig;
 pub use snowflake::SnowflakeDataStore;
 use std::collections::HashMap;

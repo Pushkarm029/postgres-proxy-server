@@ -3,7 +3,7 @@ use crate::data_store::{DataStoreClient, DataStoreError, DataStoreMapping};
 use async_trait::async_trait;
 use pgwire::api::{
     portal::Format,
-    results::{QueryResponse, Response, Tag},
+    results::{QueryResponse, Response},
 };
 use sqlparser::dialect::PostgreSqlDialect;
 use tokio_postgres::{Client, NoTls};
