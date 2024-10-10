@@ -13,7 +13,7 @@ where
     M: DataStoreMapping,
     S: SemanticModelStore,
 {
-    // First apply the transformations for the body, then each cte recursively
+    // First apply the transformations for the body, then each CTE recursively
     apply_set_expression(&mut query.body, data_store_mapping, semantic_model)?;
 
     if let Some(with) = &mut query.with {
@@ -38,11 +38,63 @@ where
         SetExpr::Select(select) => {
             for projection in &mut select.projection {
                 match projection {
-                    SelectItem::UnnamedExpr(expr) => {
-                        rewrite_expression(expr, data_store, semantic_model)?
-                    }
                     SelectItem::ExprWithAlias { expr, .. } => {
-                        rewrite_expression(expr, data_store, semantic_model)?
+                        rewrite_expression(expr, data_store, semantic_model)?;
+                    }
+                    SelectItem::UnnamedExpr(expr) => {
+                        // Rewrite the expression
+                        println!("rewritten_expr: {:?}", expr.to_string());
+                        let old_expr = expr.clone();
+                        let rewritten_expr = rewrite_expression(expr, data_store, semantic_model)?;
+                        // Check if the rewritten expression is a function and its name is "MEASURE"
+                        if let Expr::Function(func) = &old_expr {
+                            let args = match &func.args {
+                                FunctionArguments::List(args) => args,
+                                _ => {
+                                    return Err(SqlParserError::MeasureFunctionError(
+                                        "MEASURE function expects a single identifier argument".to_string(),
+                                    ))
+                                }
+                            };
+                            println!("args: {:?}", args);                        
+                            let ident = match &args.args[0] {
+                                FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::CompoundIdentifier(ident))) => ident,
+                                FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(ident))) => {
+                                    &vec![ident.clone()]
+                                }
+                                _ => {
+                                    return Err(SqlParserError::MeasureFunctionError(
+                                        "MEASURE function expects a single identifier argument".to_string(),
+                                    ))
+                                }
+                            };
+                                                
+                            // let table_name = ident.get(0).unwrap().value.as_str();
+                            // let measure_name = ident.get(1).unwrap().value.as_str();
+                            let (_, measure_name) = if ident.len() == 2 {
+                                (ident[0].value.as_str(), ident[1].value.as_str())
+                            } else if ident.len() == 1 {
+                                ("", ident[0].value.as_str())
+                            } else {
+                                return Err(SqlParserError::MeasureFunctionError(
+                                    "Invalid MEASURE function argument".to_string(),
+                                ));
+                            };
+                        
+                            if func.name.to_string().to_uppercase() == "MEASURE" {
+                                // Set the new projection as an ExprWithAlias
+                                *projection = SelectItem::ExprWithAlias {
+                                    expr: rewritten_expr.clone(),
+                                    alias: Ident::new(measure_name.to_string()), // Use the rewritten expression's string as the alias
+                                };
+                            } else {
+                                // For other cases, just update the projection with the rewritten expression
+                                *projection = SelectItem::UnnamedExpr(rewritten_expr);
+                            }
+                        } else {
+                            // For non-function expressions, just update the projection
+                            *projection = SelectItem::UnnamedExpr(rewritten_expr);
+                        }
                     }
                     _ => (),
                 }
@@ -74,7 +126,7 @@ fn rewrite_expression<D, S>(
     expr: &mut Expr,
     data_store: &D,
     semantic_model: &S,
-) -> Result<(), SqlParserError>
+) -> Result<Expr, SqlParserError>
 where
     D: DataStoreMapping,
     S: SemanticModelStore,
@@ -98,6 +150,8 @@ where
                     };
                 }
             }
+            // println!("OLD: {:?}", func);
+            // println!("NEW: {:?}", new_func);
             Expr::Function(new_func)
         }
         Expr::BinaryOp { left, right, op } => {
@@ -122,8 +176,8 @@ where
         _ => expr.clone(),
     };
 
-    *expr = new_expr;
-    Ok(())
+    *expr = new_expr.clone(); // Update the original expression with the new one
+    Ok(new_expr) // Return the new expression
 }
 
 /// Rewrites the custom `MEASURE` function to the corresponding SQL based on the semantic model.
@@ -154,6 +208,8 @@ where
             ))
         }
     };
+    println!("args: {:?}", args);
+    println!("func: {:?}", func.to_string());
 
     if args.args.len() != 1 {
         return Err(SqlParserError::MeasureFunctionError(
@@ -162,26 +218,35 @@ where
     }
 
     println!("ident: {:?}", args);
-
     let ident = match &args.args[0] {
-        // TODO: needs fix, it is not accessary to have table name with keyword everytime.
         FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::CompoundIdentifier(ident))) => ident,
+        FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(ident))) => {
+            &vec![ident.clone()]
+        }
         _ => {
             return Err(SqlParserError::MeasureFunctionError(
-                "MEASURE function expects a single identifier argument with a table name"
-                    .to_string(),
+                "MEASURE function expects a single identifier argument".to_string(),
             ))
         }
     };
 
-    if ident.len() != 2 {
-        return Err(SqlParserError::MeasureFunctionError(
-            "MEASURE function expects a single identifier argument with a table name".to_string(),
-        ));
-    }
+    // if ident.len() != 2 {
+    //     return Err(SqlParserError::MeasureFunctionError(
+    //         "MEASURE function expects a single identifier argument with a table name".to_string(),
+    //     ));
+    // }
 
-    let table_name = ident.get(0).unwrap().value.as_str();
-    let measure_name = ident.get(1).unwrap().value.as_str();
+    // let table_name = ident.get(0).unwrap().value.as_str();
+    // let measure_name = ident.get(1).unwrap().value.as_str();
+    let (table_name, measure_name) = if ident.len() == 2 {
+        (ident[0].value.as_str(), ident[1].value.as_str())
+    } else if ident.len() == 1 {
+        ("", ident[0].value.as_str())
+    } else {
+        return Err(SqlParserError::MeasureFunctionError(
+            "Invalid MEASURE function argument".to_string(),
+        ));
+    };
     let measure = semantic_model
         .get_measure(table_name, measure_name)
         .map_err(|e| SqlParserError::MeasureFunctionError(e.to_string()))?;
@@ -194,9 +259,8 @@ where
     let expr = match statements.get(0).unwrap() {
         Statement::Query(query) => {
             match query.body.as_select().unwrap().projection.get(0).unwrap() {
-                SelectItem::UnnamedExpr(Expr::Function(new_func)) => {
-                    Expr::Function(new_func.clone())
-                }
+                SelectItem::UnnamedExpr(expr) => expr.clone(),
+                SelectItem::ExprWithAlias { expr, .. } => expr.clone(),
                 _ => {
                     return Err(SqlParserError::MeasureFunctionError(
                         "MEASURE function expects a single function expression".to_string(),

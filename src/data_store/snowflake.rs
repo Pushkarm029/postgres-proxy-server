@@ -14,25 +14,25 @@ pub struct SnowflakeDataStore {
 pub struct SnowflakeMapping;
 
 // TODO: Fix me
-impl Clone for SnowflakeDataStore {
-    fn clone(&self) -> Self {
-        SnowflakeDataStore {
-            config: self.config.clone(),
-            client: SnowflakeClient::new(
-                &self.config.user,
-                SnowflakeAuthMethod::Password(self.config.password.clone()),
-                SnowflakeClientConfig {
-                    account: self.config.account.clone(),
-                    warehouse: Some(self.config.warehouse.clone()),
-                    database: Some(self.config.database.clone()),
-                    schema: Some(self.config.schema.clone()),
-                    ..Default::default()
-                },
-            )
-            .unwrap(),
-        }
-    }
-}
+// impl Clone for SnowflakeDataStore {
+//     fn clone(&self) -> Self {
+//         SnowflakeDataStore {
+//             config: self.config.clone(),
+//             client: SnowflakeClient::new(
+//                 &self.config.user,
+//                 SnowflakeAuthMethod::Password(self.config.password.clone()),
+//                 SnowflakeClientConfig {
+//                     account: self.config.account.clone(),
+//                     warehouse: Some(self.config.warehouse.clone()),
+//                     database: Some(self.config.database.clone()),
+//                     schema: Some(self.config.schema.clone()),
+//                     ..Default::default()
+//                 },
+//             )
+//             .unwrap(),
+//         }
+//     }
+// }
 
 impl SnowflakeDataStore {
     pub fn new(config: SnowflakeConfig) -> Result<Self, DataStoreError> {
@@ -43,9 +43,9 @@ impl SnowflakeDataStore {
                 SnowflakeAuthMethod::Password(config.password.clone()),
                 SnowflakeClientConfig {
                     account: config.account.clone(),
-                    warehouse: Some(config.warehouse.clone()),
-                    database: Some(config.database.clone()),
-                    schema: Some(config.schema.clone()),
+                    // warehouse: Some(config.warehouse.clone()),
+                    // database: Some(config.database.clone()),
+                    // schema: Some(config.schema.clone()),
                     ..Default::default()
                 },
             )

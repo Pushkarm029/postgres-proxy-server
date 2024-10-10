@@ -106,11 +106,15 @@ mod test {
     #[rstest]
     #[case::simple_query(
         "SELECT department_level_1, MEASURE(dm_employees.headcount) FROM dm_employees;",
-        "SELECT department_level_1, COUNT(dm_employees.id) FROM dm_employees"
+        "SELECT department_level_1, COUNT(dm_employees.id) AS headcount FROM dm_employees"
+    )]
+    #[case::simple_query_two(
+        "SELECT department_level_1, MEASURE(dm_employees.headcount) AS headcount FROM dm_employees;",
+        "SELECT department_level_1, COUNT(dm_employees.id) AS headcount FROM dm_employees"
     )]
     #[case::query_with_cte(
         "WITH cte AS (SELECT department_level_1, MEASURE(dm_employees.headcount) FROM dm_employees) SELECT * FROM cte;",
-        "WITH cte AS (SELECT department_level_1, COUNT(dm_employees.id) FROM dm_employees) SELECT * FROM cte"
+        "WITH cte AS (SELECT department_level_1, COUNT(dm_employees.id) AS headcount FROM dm_employees) SELECT * FROM cte"
     )]
     #[case::measure_alias_should_be_ignored_first(
         "SELECT department_level_1, MEASURE(dm_employees.headcount) AS 'MEASURE(headcount)' FROM dm_employees;",
@@ -122,19 +126,19 @@ mod test {
     )]
     #[case::test_multiple_tables(
         "SELECT dm_departments.department_level_1_name, MEASURE(dm_employees.headcount) FROM dm_employees LEFT JOIN dm_departments ON dm_employees.department_level_1 = dm_departments.department_level_1;",
-        "SELECT dm_departments.department_level_1_name, COUNT(dm_employees.id) FROM dm_employees LEFT JOIN dm_departments ON dm_employees.department_level_1 = dm_departments.department_level_1"
+        "SELECT dm_departments.department_level_1_name, COUNT(dm_employees.id) AS headcount FROM dm_employees LEFT JOIN dm_departments ON dm_employees.department_level_1 = dm_departments.department_level_1"
     )]
     #[case::test_multiple_measures(
         "SELECT department_level_1, MEASURE(dm_employees.headcount), MEASURE(dm_employees.ending_headcount) FROM dm_employees;",
-        "SELECT department_level_1, COUNT(dm_employees.id), count(DISTINCT dm_employees.effective_date) FROM dm_employees"
+        "SELECT department_level_1, COUNT(dm_employees.id) AS headcount, count(DISTINCT dm_employees.effective_date) AS ending_headcount FROM dm_employees"
     )]
     #[case::test_union(
         "SELECT department_level_1, MEASURE(dm_employees.headcount), false as is_total FROM dm_employees UNION SELECT null as department_level_1, MEASURE(dm_employees.headcount), true as is_total FROM dm_employees;",
-        "SELECT department_level_1, COUNT(dm_employees.id), false AS is_total FROM dm_employees UNION SELECT NULL AS department_level_1, COUNT(dm_employees.id), true AS is_total FROM dm_employees"
+        "SELECT department_level_1, COUNT(dm_employees.id) AS headcount, false AS is_total FROM dm_employees UNION SELECT NULL AS department_level_1, COUNT(dm_employees.id) AS headcount, true AS is_total FROM dm_employees"
     )]
     #[case::test_subquery(
         "SELECT subquery.department_level_1, MEASURE(dm_employees.headcount) FROM (SELECT * FROM dm_employees) AS subquery;",
-        "SELECT subquery.department_level_1, COUNT(dm_employees.id) FROM (SELECT * FROM dm_employees) AS subquery"
+        "SELECT subquery.department_level_1, COUNT(dm_employees.id) AS headcount FROM (SELECT * FROM dm_employees) AS subquery"
     )]
     // #[case::interval_statement_in_dialect(
     //     "SELECT '1 day'::interval as interval_column",
@@ -148,7 +152,7 @@ mod test {
     )]
     #[case::test_distinct_on_snowflake_dialect(
         "SELECT DISTINCT ON (department_level_1) department_level_1, MEASURE(dm_employees.headcount) FROM dm_employees;",
-        "SELECT DISTINCT ON (department_level_1) department_level_1, COUNT(dm_employees.id) FROM dm_employees"
+        "SELECT DISTINCT ON (department_level_1) department_level_1, COUNT(dm_employees.id) AS headcount FROM dm_employees"
     )]
     fn test_parser_on_postgres(#[case] initial_query: &str, #[case] expected_query: &str) {
         let sql_parser = sql_parser_fixture();
