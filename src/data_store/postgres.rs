@@ -11,7 +11,6 @@ use std::sync::Arc;
 use tokio_postgres::{Client, NoTls};
 
 pub struct PostgresDataStore {
-    config: PostgresConfig,
     client: Client,
 }
 
@@ -35,18 +34,9 @@ impl PostgresDataStore {
             }
         });
 
-        Ok(PostgresDataStore { config, client })
+        Ok(PostgresDataStore { client })
     }
 }
-
-// impl<'a> Clone for PostgresDataStore {
-//     fn clone(&self) -> Self {
-//         // Implement a way to clone the client, or manage a new connection
-//         // Note: tokio_postgres::Client is not cloneable, so you would need
-//         // to re-establish the connection or share the same client connection
-//         todo!("Make the data store/connection cloneable")
-//     }
-// }
 
 impl DataStoreMapping for PostgresMapping {
     fn get_dialect(&self) -> &dyn sqlparser::dialect::Dialect {

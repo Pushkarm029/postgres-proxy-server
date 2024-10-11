@@ -10,7 +10,6 @@ use pgwire::api::results::{QueryResponse, Response};
 use snowflake_connector_rs::SnowflakeSession;
 use snowflake_connector_rs::{SnowflakeAuthMethod, SnowflakeClient, SnowflakeClientConfig};
 pub struct SnowflakeDataStore {
-    config: SnowflakeConfig,
     client: SnowflakeClient,
 }
 
@@ -19,7 +18,6 @@ pub struct SnowflakeMapping;
 impl SnowflakeDataStore {
     pub fn new(config: SnowflakeConfig) -> Result<Self, DataStoreError> {
         Ok(SnowflakeDataStore {
-            config: config.clone(),
             client: SnowflakeClient::new(
                 &config.account,
                 SnowflakeAuthMethod::Password(config.password.clone()),
@@ -66,7 +64,6 @@ impl DataStoreClient for SnowflakeDataStore {
     }
 
     async fn execute(&self, query: &str) -> Result<Vec<Response>, DataStoreError> {
-        // let config = self.config.clone();
         let session = self.connect().await?;
 
         let rows = session
