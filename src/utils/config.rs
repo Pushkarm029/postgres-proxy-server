@@ -39,18 +39,24 @@ pub struct SnowflakeConfig {
     pub password: String,
 
     #[envconfig(from = "SNOWFLAKE_WAREHOUSE")]
-    pub warehouse: String,
+    pub warehouse: Option<String>,
 
     #[envconfig(from = "SNOWFLAKE_DATABASE")]
-    pub database: String,
+    pub database: Option<String>,
 
     #[envconfig(from = "SNOWFLAKE_SCHEMA")]
-    pub schema: String,
+    pub schema: Option<String>,
+
+    #[envconfig(from = "SNOWFLAKE_ROLE")]
+    pub role: Option<String>,
+
+    #[envconfig(from = "SNOWFLAKE_TIMEOUT")]
+    pub timeout: Option<u64>,
 }
 
 #[derive(Envconfig, Clone)]
 pub struct S3Config {
-    #[envconfig(from = "TENANT", default = "tenant1")]
+    #[envconfig(from = "TENANT")]
     pub tenant: String,
 
     #[envconfig(from = "S3_BUCKET_NAME")]

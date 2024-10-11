@@ -56,7 +56,7 @@ impl S3SemanticModelStore {
 
         let keys = result
             .contents()
-            .into_iter()
+            .iter()
             .map(|c| c.key().unwrap().to_string())
             .filter(|k| k.ends_with(".json"))
             .collect();

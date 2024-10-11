@@ -52,23 +52,27 @@ where
                                 FunctionArguments::List(args) => args,
                                 _ => {
                                     return Err(SqlParserError::MeasureFunctionError(
-                                        "MEASURE function expects a single identifier argument".to_string(),
+                                        "MEASURE function expects a single identifier argument"
+                                            .to_string(),
                                     ))
                                 }
                             };
-                            println!("args: {:?}", args);                        
+                            println!("args: {:?}", args);
                             let ident = match &args.args[0] {
-                                FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::CompoundIdentifier(ident))) => ident,
-                                FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(ident))) => {
-                                    &vec![ident.clone()]
-                                }
+                                FunctionArg::Unnamed(FunctionArgExpr::Expr(
+                                    Expr::CompoundIdentifier(ident),
+                                )) => ident,
+                                FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(
+                                    ident,
+                                ))) => &vec![ident.clone()],
                                 _ => {
                                     return Err(SqlParserError::MeasureFunctionError(
-                                        "MEASURE function expects a single identifier argument".to_string(),
+                                        "MEASURE function expects a single identifier argument"
+                                            .to_string(),
                                     ))
                                 }
                             };
-                                                
+
                             // let table_name = ident.get(0).unwrap().value.as_str();
                             // let measure_name = ident.get(1).unwrap().value.as_str();
                             let (_, measure_name) = if ident.len() == 2 {
@@ -80,7 +84,7 @@ where
                                     "Invalid MEASURE function argument".to_string(),
                                 ));
                             };
-                        
+
                             if func.name.to_string().to_uppercase() == "MEASURE" {
                                 // Set the new projection as an ExprWithAlias
                                 *projection = SelectItem::ExprWithAlias {
@@ -256,9 +260,9 @@ where
     let statements = Parser::parse_sql(dialect, &statement_sql)
         .map_err(|e| SqlParserError::MeasureFunctionError(e.to_string()))?;
 
-    let expr = match statements.get(0).unwrap() {
+    let expr = match statements.first().unwrap() {
         Statement::Query(query) => {
-            match query.body.as_select().unwrap().projection.get(0).unwrap() {
+            match query.body.as_select().unwrap().projection.first().unwrap() {
                 SelectItem::UnnamedExpr(expr) => expr.clone(),
                 SelectItem::ExprWithAlias { expr, .. } => expr.clone(),
                 _ => {

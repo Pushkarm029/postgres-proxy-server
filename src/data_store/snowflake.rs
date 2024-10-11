@@ -1,38 +1,20 @@
+use std::sync::Arc;
+use std::time::Duration;
+
 use crate::data_store::{DataStoreClient, DataStoreError, DataStoreMapping};
 use crate::utils::config::SnowflakeConfig;
+use crate::utils::encoding::{encode_snowflake_row_data, snowflake_row_desc_from_stmt};
 use async_trait::async_trait;
-use pgwire::api::results::Response;
-use pgwire::messages::data::DataRow;
+use pgwire::api::portal::Format;
+use pgwire::api::results::{QueryResponse, Response};
 use snowflake_connector_rs::SnowflakeSession;
 use snowflake_connector_rs::{SnowflakeAuthMethod, SnowflakeClient, SnowflakeClientConfig};
-
 pub struct SnowflakeDataStore {
     config: SnowflakeConfig,
     client: SnowflakeClient,
 }
 
 pub struct SnowflakeMapping;
-
-// TODO: Fix me
-// impl Clone for SnowflakeDataStore {
-//     fn clone(&self) -> Self {
-//         SnowflakeDataStore {
-//             config: self.config.clone(),
-//             client: SnowflakeClient::new(
-//                 &self.config.user,
-//                 SnowflakeAuthMethod::Password(self.config.password.clone()),
-//                 SnowflakeClientConfig {
-//                     account: self.config.account.clone(),
-//                     warehouse: Some(self.config.warehouse.clone()),
-//                     database: Some(self.config.database.clone()),
-//                     schema: Some(self.config.schema.clone()),
-//                     ..Default::default()
-//                 },
-//             )
-//             .unwrap(),
-//         }
-//     }
-// }
 
 impl SnowflakeDataStore {
     pub fn new(config: SnowflakeConfig) -> Result<Self, DataStoreError> {
@@ -43,10 +25,11 @@ impl SnowflakeDataStore {
                 SnowflakeAuthMethod::Password(config.password.clone()),
                 SnowflakeClientConfig {
                     account: config.account.clone(),
-                    // warehouse: Some(config.warehouse.clone()),
-                    // database: Some(config.database.clone()),
-                    // schema: Some(config.schema.clone()),
-                    ..Default::default()
+                    warehouse: config.warehouse,
+                    database: config.database,
+                    schema: config.schema,
+                    role: config.role,
+                    timeout: config.timeout.map(Duration::from_secs),
                 },
             )
             .unwrap(),
@@ -55,10 +38,7 @@ impl SnowflakeDataStore {
 
     async fn connect(&self) -> Result<SnowflakeSession, DataStoreError> {
         self.client.create_session().await.map_err(|e| {
-            DataStoreError::ConnectionError(format!(
-                "Failed to connect to Snowflake, {}",
-                e.to_string()
-            ))
+            DataStoreError::ConnectionError(format!("Failed to connect to Snowflake, {}", e))
         })
     }
 }
@@ -93,9 +73,14 @@ impl DataStoreClient for SnowflakeDataStore {
             .query(query)
             .await
             .map_err(|e| DataStoreError::QueryError(e.to_string()))?;
-        let data = vec![DataRow::default()];
 
-        todo!("Implement SnowflakeDataStore::execute");
-        // Ok(data)
+        let field_info = snowflake_row_desc_from_stmt(&rows, &Format::UnifiedText)
+            .map_err(|e| DataStoreError::ColumnNotFound(e.to_string()))?;
+        let field_info_arc = Arc::new(field_info);
+        let data_rows = encode_snowflake_row_data(rows, field_info_arc.clone());
+        Ok(vec![Response::Query(QueryResponse::new(
+            field_info_arc,
+            Box::pin(data_rows),
+        ))])
     }
 }

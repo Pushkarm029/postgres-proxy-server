@@ -1,6 +1,6 @@
 use crate::data_store::{DataStoreClient, DataStoreError, DataStoreMapping};
 use crate::utils::config::PostgresConfig;
-use crate::utils::encoding::{encode_row_data, row_desc_from_stmt};
+use crate::utils::encoding::{encode_postgres_row_data, postgres_row_desc_from_stmt};
 use async_trait::async_trait;
 use pgwire::api::{
     portal::Format,
@@ -85,10 +85,10 @@ impl DataStoreClient for PostgresDataStore {
             .await
             .map_err(|e| DataStoreError::ColumnNotFound(e.to_string()))?;
 
-        let field_info = row_desc_from_stmt(&stmt, &Format::UnifiedText)
+        let field_info = postgres_row_desc_from_stmt(&stmt, &Format::UnifiedText)
             .map_err(|e| DataStoreError::ColumnNotFound(e.to_string()))?;
         let field_info_arc = Arc::new(field_info);
-        let data_rows = encode_row_data(rows, field_info_arc.clone());
+        let data_rows = encode_postgres_row_data(rows, field_info_arc.clone());
         Ok(vec![Response::Query(QueryResponse::new(
             field_info_arc,
             Box::pin(data_rows),
