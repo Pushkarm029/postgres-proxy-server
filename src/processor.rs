@@ -30,7 +30,7 @@ where
     ) -> PgWireResult<Vec<Response<'a>>> {
         let query_handler = self.query_handler.lock().await;
         query_handler.handle(query).await.unwrap();
-        todo!("Map result to pgwire response");
+        todo!("Return this handle result, without disturbing lifetime");
     }
 }
 
