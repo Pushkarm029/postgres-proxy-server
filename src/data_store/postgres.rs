@@ -63,6 +63,7 @@ impl DataStoreClient for PostgresDataStore {
     }
 
     async fn execute(&self, sql: &str) -> Result<Vec<Response>, DataStoreError> {
+        println!("Executing SQL: {}", sql);
         let rows = self
             .client
             .query(sql, &[])
