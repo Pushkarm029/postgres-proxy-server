@@ -11,10 +11,9 @@ use pgwire::api::{
 };
 use pgwire::error::PgWireResult;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 
 pub struct Processor<D, S> {
-    query_handler: Arc<Mutex<QueryHandler<D, S>>>,
+    query_handler: Arc<QueryHandler<D, S>>,
 }
 
 #[async_trait]
@@ -27,10 +26,12 @@ where
         &self,
         _client: &mut C,
         query: &'a str,
-    ) -> PgWireResult<Vec<Response<'a>>> {
-        let query_handler = self.query_handler.lock().await;
-        query_handler.handle(query).await.unwrap();
-        todo!("Return this handle result, without disturbing lifetime");
+    ) -> PgWireResult<Vec<Response<'a>>>
+    where
+        'life0: 'a,
+    {
+        let query_handler = &self.query_handler;
+        query_handler.handle(query).await
     }
 }
 
@@ -41,7 +42,7 @@ where
 {
     pub fn new(data_store: D, semantic_model: S) -> Self {
         Self {
-            query_handler: Arc::new(Mutex::new(QueryHandler::new(data_store, semantic_model))),
+            query_handler: Arc::new(QueryHandler::new(data_store, semantic_model)),
         }
     }
 }

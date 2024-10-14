@@ -14,7 +14,7 @@ pub enum SqlParserError {
 
     #[error("SQL parsing error: {0}")]
     SqlParseError(String),
-    
+
     #[error("MEASURE function error: {0}")]
     MeasureFunctionError(String),
 }
