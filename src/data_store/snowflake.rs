@@ -30,7 +30,7 @@ impl SnowflakeDataStore {
                     timeout: config.timeout.map(Duration::from_secs),
                 },
             )
-            .unwrap(),
+            .map_err(|e| DataStoreError::ConnectionError(e.to_string()))?,
         })
     }
 

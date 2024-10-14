@@ -3,8 +3,8 @@ pub mod snowflake;
 
 use async_trait::async_trait;
 use pgwire::api::results::Response;
+use std::error::Error;
 use std::fmt;
-
 /// DataStoreMapping handles the mapping logic for types and functions
 /// between different SQL dialects.
 pub trait DataStoreMapping {
@@ -67,3 +67,5 @@ impl fmt::Display for DataStoreError {
         }
     }
 }
+
+impl Error for DataStoreError {}

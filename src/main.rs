@@ -6,6 +6,6 @@ mod server;
 mod sql_parser;
 mod utils;
 
-fn main() {
-    server::main();
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    server::main()
 }

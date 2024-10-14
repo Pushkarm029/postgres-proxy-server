@@ -23,7 +23,6 @@ where
     }
 
     pub async fn handle(&self, query: &str) -> PgWireResult<Vec<Response>> {
-        // Parse the query using the sql parser
         let sql = SqlParser::new(D::get_mapping(), self.semantic_model.clone())
             .parse(query)
             .map_err(|e| {

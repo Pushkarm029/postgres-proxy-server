@@ -19,6 +19,21 @@ pub enum SqlParserError {
     MeasureFunctionError(String),
 }
 
+/// Custom error type for SQL transformation errors
+#[derive(Error, Debug)]
+pub enum SqlTransformError {
+    #[error("Invalid MEASURE function: {0}")]
+    InvalidMeasureFunction(String),
+    #[error("Invalid function argument: {0}")]
+    InvalidFunctionArgument(String),
+    #[error("Semantic model error: {0}")]
+    SemanticModelError(String),
+    #[error("SQL parsing error: {0}")]
+    SqlParsingError(String),
+    #[error("Unsupported SQL construct: {0}")]
+    UnsupportedSqlConstruct(String),
+}
+
 pub struct SqlParser<M, S> {
     data_store_mapping: M,
     semantic_model: S,
@@ -63,7 +78,8 @@ where
                         &mut query,
                         &self.data_store_mapping,
                         &self.semantic_model,
-                    )?;
+                    )
+                    .map_err(|e| SqlParserError::MeasureFunctionError(e.to_string()))?;
                     Ok(Statement::Query(query))
                 }
                 _ => Err(SqlParserError::PermissionDenied(
@@ -137,12 +153,6 @@ mod test {
         "SELECT subquery.department_level_1, MEASURE(dm_employees.headcount) FROM (SELECT * FROM dm_employees) AS subquery;",
         "SELECT subquery.department_level_1, COUNT(dm_employees.id) AS headcount FROM (SELECT * FROM dm_employees) AS subquery"
     )]
-    // #[case::interval_statement_in_dialect(
-    //     "SELECT '1 day'::interval as interval_column",
-    //     "SELECT INTERVAL '1 day' as interval_column"
-    // )]
-    // as -> AS, correct or not
-    // 11, 10
     #[case::test_case_statement(
         "SELECT CASE WHEN department_level_1 = 'a' THEN 'a' WHEN department_level_1 = 'b' THEN 'b' ELSE 'c' END as case_column FROM dm_employees;",
         "SELECT CASE WHEN department_level_1 = 'a' THEN 'a' WHEN department_level_1 = 'b' THEN 'b' ELSE 'c' END AS case_column FROM dm_employees"
