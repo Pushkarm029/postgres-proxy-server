@@ -92,3 +92,9 @@
    ```bash
    psql --version
    ```
+
+
+### TEST Snowflake w sqls (currently snowflake contains same data as demo.csv)
+![alt text](image.png)
+run make local-snowflake-run
+1. SELECT name, MEASURE(dm_employees.headcount) AS headcount FROM TEST.PUBLIC.TEST GROUP BY name;

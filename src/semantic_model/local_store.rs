@@ -21,7 +21,8 @@ impl LocalSemanticModelStore {
                     aggregation: "COUNT_DISTINCT".to_string(),
                     // sql: "COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END)".to_string(),
                     // Use simpler re-write for easier to read test cases
-                    sql: "COUNT(dm_employees.id)".to_string(),
+                    // just for snowflake test
+                    sql: "COUNT(TEST.id)".to_string(),
                 },
                 Measure {
                     name: "ending_headcount".to_string(),

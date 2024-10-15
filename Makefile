@@ -5,11 +5,28 @@ DB_USER = postgres
 DB_PASSWORD = postgres
 DB_HOST = localhost
 DB_PORT = 5432
+SNOWFLAKE_USER = "PUSHKARM029"
+SNOWFLAKE_ROLE = "ACCOUNTADMIN"
+SNOWFLAKE_ACCOUNT = "do36518.ap-southeast-1"
+SNOWFLAKE_WAREHOUSE = "TEST"
+
 # Section: Postgres & Local
 local-pg-test: 
 	@echo "Running tests with Postgres and local storage..."
 	RUST_LOG=trace \
 	$(CARGO) test
+
+local-snowflake-run:
+	@echo "Running tests with Snowflake and local storage..."
+	@DATA_STORE="snowflake" \
+	SEMANTIC_MODEL_STORE="local" \
+	SNOWFLAKE_ACCOUNT="$(SNOWFLAKE_ACCOUNT)" \
+	SNOWFLAKE_ROLE="$(SNOWFLAKE_ROLE)" \
+	SNOWFLAKE_USER="$(SNOWFLAKE_USER)" \
+	SNOWFLAKE_PASSWORD="Pushkar#2004" \
+	SNOWFLAKE_WAREHOUSE="$(SNOWFLAKE_WAREHOUSE)" \
+	RUST_LOG=trace \
+	$(CARGO) run
 
 local-pg-run:
 	@echo "Running in production mode with Postgres and local storage..."

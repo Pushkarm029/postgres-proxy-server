@@ -19,7 +19,7 @@ impl SnowflakeDataStore {
     pub fn new(config: SnowflakeConfig) -> Result<Self, DataStoreError> {
         Ok(SnowflakeDataStore {
             client: SnowflakeClient::new(
-                &config.account,
+                &config.user,
                 SnowflakeAuthMethod::Password(config.password.clone()),
                 SnowflakeClientConfig {
                     account: config.account.clone(),
@@ -35,6 +35,18 @@ impl SnowflakeDataStore {
     }
 
     async fn connect(&self) -> Result<SnowflakeSession, DataStoreError> {
+        // let client = SnowflakeClient::new(
+        //     "PUSHKARM029",
+        //     SnowflakeAuthMethod::Password("Mishra#2004".to_owned()),
+        //     SnowflakeClientConfig {
+        //         account: "do36518.ap-southeast-1".to_owned(),
+        //         warehouse: Some("TEST".to_owned()),
+        //         database: None,
+        //         schema: None,
+        //         role: Some("ACCOUNTADMIN".to_owned()),
+        //         timeout: None,
+        //     },
+        // ).unwrap();
         self.client.create_session().await.map_err(|e| {
             DataStoreError::ConnectionError(format!("Failed to connect to Snowflake, {}", e))
         })

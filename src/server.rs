@@ -1,9 +1,10 @@
 use crate::data_store::postgres::PostgresDataStore;
+use crate::data_store::snowflake::SnowflakeDataStore;
 use crate::data_store::DataStoreClient;
 use crate::processor::ProcessorFactory;
 use crate::semantic_model::local_store::LocalSemanticModelStore;
 use crate::semantic_model::SemanticModelStore;
-use crate::utils::config::{Config, PostgresConfig};
+use crate::utils::config::{Config, PostgresConfig, SnowflakeConfig};
 use envconfig::Envconfig;
 use log::{error, info};
 use std::process;
@@ -85,27 +86,74 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-impl ProxyServer<PostgresDataStore, LocalSemanticModelStore> {
+// impl ProxyServer<PostgresDataStore, LocalSemanticModelStore> {
+//     pub async fn with_config(config: Config) -> Result<Self, Box<dyn std::error::Error>> {
+//         let data_store = match config.data_store.as_str() {
+//             "postgres" => {
+//                 info!("Using PostgresDataStore");
+//                 let postgres_config = PostgresConfig::init_from_env().map_err(|e| {
+//                     error!("Failed to initialize Postgres DataStore config: {}", e);
+//                     e
+//                 })?;
+
+//                 PostgresDataStore::new(postgres_config).await.map_err(|e| {
+//                     error!("Failed to create PostgresDataStore: {}", e);
+//                     e
+//                 })?
+//             }
+//             val => {
+//                 error!("Invalid data store type: {}", val);
+//                 return Err(format!("Unsupported data store type: {}", val).into());
+//             }
+//         };
+
+//         let semantic_model_store = match config.semantic_model_store.as_str() {
+//             "local" => {
+//                 info!("Using LocalSemanticModelStore");
+//                 LocalSemanticModelStore::mock()
+//             }
+//             val => {
+//                 error!("Invalid semantic model store type: {}", val);
+//                 return Err(format!("Unsupported semantic model store type: {}", val).into());
+//             }
+//         };
+
+//         Ok(Self {
+//             config,
+//             factory: Arc::new(ProcessorFactory::new(data_store, semantic_model_store)),
+//         })
+//     }
+// }
+
+impl ProxyServer<SnowflakeDataStore, LocalSemanticModelStore> {
     pub async fn with_config(config: Config) -> Result<Self, Box<dyn std::error::Error>> {
-        let data_store = match config.data_store.as_str() {
-            "postgres" => {
-                info!("Using PostgresDataStore");
-                let postgres_config = PostgresConfig::init_from_env().map_err(|e| {
-                    error!("Failed to initialize Postgres DataStore config: {}", e);
-                    e
-                })?;
+        // let data_store = match config.data_store.as_str() {
+        //     "postgres" => {
+        //         info!("Using PostgresDataStore");
+        //         let postgres_config = PostgresConfig::init_from_env().map_err(|e| {
+        //             error!("Failed to initialize Postgres DataStore config: {}", e);
+        //             e
+        //         })?;
 
-                PostgresDataStore::new(postgres_config).await.map_err(|e| {
-                    error!("Failed to create PostgresDataStore: {}", e);
-                    e
-                })?
-            }
-            val => {
-                error!("Invalid data store type: {}", val);
-                return Err(format!("Unsupported data store type: {}", val).into());
-            }
-        };
+        //         PostgresDataStore::new(postgres_config).await.map_err(|e| {
+        //             error!("Failed to create PostgresDataStore: {}", e);
+        //             e
+        //         })?
+        //     }
+        //     val => {
+        //         error!("Invalid data store type: {}", val);
+        //         return Err(format!("Unsupported data store type: {}", val).into());
+        //     }
+        // };
 
+        let snowflake_config = SnowflakeConfig::init_from_env().map_err(|e| {
+            error!("Failed to initialize Snowflake DataStore config: {}", e);
+            e
+        })?;
+        let data_store = SnowflakeDataStore::new(snowflake_config).map_err(|e| {
+            error!("Failed to create SnowflakeDataStore: {}", e);
+            e
+        })?;
         let semantic_model_store = match config.semantic_model_store.as_str() {
             "local" => {
                 info!("Using LocalSemanticModelStore");
