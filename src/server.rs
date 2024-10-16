@@ -71,6 +71,11 @@ where
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
+    if let Err(e) = dotenv::dotenv() {
+        error!("Could not load environment variables from .env file: {}", e);
+        process::exit(1);
+    }
+
     let config = Config::init_from_env().map_err(|e| {
         error!("Failed to initialize config: {}", e);
         e
