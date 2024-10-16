@@ -1,6 +1,7 @@
 use crate::data_store::DataStoreClient;
 use crate::semantic_model::SemanticModelStore;
 use crate::sql_parser::SqlParser;
+use log::debug;
 use pgwire::api::results::Response;
 use pgwire::error::PgWireResult;
 use pgwire::error::{ErrorInfo, PgWireError};
@@ -23,6 +24,7 @@ where
     }
 
     pub async fn handle(&self, query: &str) -> PgWireResult<Vec<Response>> {
+        debug!("Initial query: {}", query);
         let sql = SqlParser::new(D::get_mapping(), self.semantic_model.clone())
             .parse(query)
             .map_err(|e| {
@@ -32,6 +34,7 @@ where
                     e.to_string(),
                 )))
             })?;
+        debug!("Transformed query: {}", sql);
 
         // Execute the sql and return the result
         let result = self.data_store.execute(&sql).await.map_err(|e| {

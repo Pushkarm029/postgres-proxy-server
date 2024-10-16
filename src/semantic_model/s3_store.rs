@@ -1,4 +1,4 @@
-use crate::utils::config::S3Config;
+use crate::config::S3Config;
 
 use super::{Measure, SemanticModel, SemanticModelStore, SemanticModelStoreError};
 use aws_sdk_s3::{config::BehaviorVersion, Client};
