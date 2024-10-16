@@ -53,7 +53,9 @@ where
 
     pub fn parse(&self, query: &str) -> Result<String, SqlParserError> {
         let ast_list = self.parse_query(query)?;
+        log::debug!("Received ast: {:#?}", ast_list);
         let transformed_ast_list = self.transform_ast(ast_list)?;
+        log::debug!("Transformed ast: {:#?}", transformed_ast_list);
 
         let output_queries: Result<Vec<String>, SqlParserError> = transformed_ast_list
             .into_iter()
