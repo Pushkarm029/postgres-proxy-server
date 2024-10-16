@@ -45,7 +45,6 @@ pub trait DataStoreClient {
 pub enum DataStoreError {
     ConnectionError(String),
     QueryError(String),
-    InsufficientPrivileges(String),
     ColumnNotFound(String),
 }
 
@@ -57,9 +56,6 @@ impl fmt::Display for DataStoreError {
             }
             DataStoreError::QueryError(details) => {
                 write!(f, "Query error: {}", details)
-            }
-            DataStoreError::InsufficientPrivileges(details) => {
-                write!(f, "Insufficient privileges: {}", details)
             }
             DataStoreError::ColumnNotFound(details) => {
                 write!(f, "Column not found: {}", details)

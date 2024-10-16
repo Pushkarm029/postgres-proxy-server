@@ -1,5 +1,5 @@
 pub mod local_store;
-mod s3_store;
+pub mod s3_store;
 
 use std::collections::HashMap;
 use thiserror::Error;

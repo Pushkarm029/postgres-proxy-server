@@ -3,7 +3,6 @@ mod transformations;
 use crate::data_store::DataStoreMapping;
 use crate::semantic_model::SemanticModelStore;
 use sqlparser::ast::*;
-use sqlparser::dialect::PostgreSqlDialect;
 use sqlparser::parser::Parser;
 use thiserror::Error;
 
@@ -64,8 +63,8 @@ where
     }
 
     fn parse_query(&self, query: &str) -> Result<Vec<Statement>, SqlParserError> {
-        let data_store = PostgreSqlDialect {};
-        let statements = Parser::parse_sql(&data_store, query)
+        let data_store = self.data_store_mapping.get_dialect();
+        let statements = Parser::parse_sql(data_store, query)
             .map_err(|e| SqlParserError::SqlParseError(e.to_string()))?;
         Ok(statements)
     }

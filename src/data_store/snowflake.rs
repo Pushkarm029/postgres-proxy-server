@@ -19,7 +19,7 @@ impl SnowflakeDataStore {
     pub fn new(config: SnowflakeConfig) -> Result<Self, DataStoreError> {
         Ok(SnowflakeDataStore {
             client: SnowflakeClient::new(
-                &config.account,
+                &config.user,
                 SnowflakeAuthMethod::Password(config.password.clone()),
                 SnowflakeClientConfig {
                     account: config.account.clone(),
