@@ -1,12 +1,57 @@
-use super::{Dimension, Measure, SemanticModel, SemanticModelStore, SemanticModelStoreError};
-use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Default)]
+use super::{Dimension, Measure, SemanticModel, SemanticModelStore, SemanticModelStoreError};
+use crate::config::SemanticModelJSONConfig;
+use log::error;
+use log::warn;
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::BufReader;
+use std::path::Path;
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct LocalSemanticModelStore {
     semantic_models: HashMap<String, SemanticModel>,
 }
 
 impl LocalSemanticModelStore {
+    pub fn load_from_json(file_path: &str) -> Result<Self, SemanticModelStoreError> {
+        let file = File::open(file_path)
+            .map_err(|_| SemanticModelStoreError::FileNotFound(file_path.to_string()))?;
+        let reader = BufReader::new(file);
+        let store: LocalSemanticModelStore = serde_json::from_reader(reader)
+            .map_err(|_| SemanticModelStoreError::InvalidJsonFormat)?;
+        Ok(store)
+    }
+
+    pub fn new() -> Result<Self, SemanticModelStoreError> {
+        match SemanticModelJSONConfig::new() {
+            Ok(config) => {
+                if Path::new(&config.json_path).exists() {
+                    match Self::load_from_json(&config.json_path) {
+                        Ok(store) => Ok(store),
+                        Err(e) => {
+                            error!(
+                                "Failed to load from JSON: {}. Falling back to mock data.",
+                                e
+                            );
+                            Ok(Self::mock())
+                        }
+                    }
+                } else {
+                    warn!(
+                        "File not found: {}. Falling back to mock data.",
+                        config.json_path
+                    );
+                    Ok(Self::mock())
+                }
+            }
+            Err(e) => {
+                warn!("{}. Falling back to mock data.", e);
+                Ok(Self::mock())
+            }
+        }
+    }
+
     pub fn mock() -> Self {
         let mut semantic_models = HashMap::new();
         let employees_model = SemanticModel {

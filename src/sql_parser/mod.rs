@@ -3,7 +3,6 @@ mod transformations;
 use crate::data_store::DataStoreMapping;
 use crate::semantic_model::SemanticModelStore;
 use sqlparser::ast::*;
-use sqlparser::dialect::PostgreSqlDialect;
 use sqlparser::parser::Parser;
 use thiserror::Error;
 
@@ -15,11 +14,23 @@ pub enum SqlParserError {
     #[error("SQL parsing error: {0}")]
     SqlParseError(String),
 
-    #[error("SQL generation error: {0}")]
-    SqlGenerationError(String),
-
     #[error("MEASURE function error: {0}")]
     MeasureFunctionError(String),
+}
+
+/// Custom error type for SQL transformation errors
+#[derive(Error, Debug)]
+pub enum SqlTransformError {
+    #[error("Invalid MEASURE function: {0}")]
+    InvalidMeasureFunction(String),
+    #[error("Invalid function argument: {0}")]
+    InvalidFunctionArgument(String),
+    #[error("Semantic model error: {0}")]
+    SemanticModelError(String),
+    #[error("SQL parsing error: {0}")]
+    SqlParsingError(String),
+    #[error("Unsupported SQL construct: {0}")]
+    UnsupportedSqlConstruct(String),
 }
 
 pub struct SqlParser<M, S> {
@@ -52,8 +63,8 @@ where
     }
 
     fn parse_query(&self, query: &str) -> Result<Vec<Statement>, SqlParserError> {
-        let data_store = PostgreSqlDialect {};
-        let statements = Parser::parse_sql(&data_store, query)
+        let data_store = self.data_store_mapping.get_dialect();
+        let statements = Parser::parse_sql(data_store, query)
             .map_err(|e| SqlParserError::SqlParseError(e.to_string()))?;
         Ok(statements)
     }
@@ -66,7 +77,8 @@ where
                         &mut query,
                         &self.data_store_mapping,
                         &self.semantic_model,
-                    )?;
+                    )
+                    .map_err(|e| SqlParserError::MeasureFunctionError(e.to_string()))?;
                     Ok(Statement::Query(query))
                 }
                 _ => Err(SqlParserError::PermissionDenied(
@@ -106,11 +118,15 @@ mod test {
     #[rstest]
     #[case::simple_query(
         "SELECT department_level_1, MEASURE(dm_employees.headcount) FROM dm_employees;",
-        "SELECT department_level_1, COUNT(dm_employees.id) FROM dm_employees"
+        "SELECT department_level_1, COUNT(dm_employees.id) AS headcount FROM dm_employees"
+    )]
+    #[case::simple_query_two(
+        "SELECT department_level_1, MEASURE(dm_employees.headcount) AS headcount FROM dm_employees;",
+        "SELECT department_level_1, COUNT(dm_employees.id) AS headcount FROM dm_employees"
     )]
     #[case::query_with_cte(
         "WITH cte AS (SELECT department_level_1, MEASURE(dm_employees.headcount) FROM dm_employees) SELECT * FROM cte;",
-        "WITH cte AS (SELECT department_level_1, COUNT(dm_employees.id) FROM dm_employees) SELECT * FROM cte"
+        "WITH cte AS (SELECT department_level_1, COUNT(dm_employees.id) AS headcount FROM dm_employees) SELECT * FROM cte"
     )]
     #[case::measure_alias_should_be_ignored_first(
         "SELECT department_level_1, MEASURE(dm_employees.headcount) AS 'MEASURE(headcount)' FROM dm_employees;",
@@ -122,33 +138,27 @@ mod test {
     )]
     #[case::test_multiple_tables(
         "SELECT dm_departments.department_level_1_name, MEASURE(dm_employees.headcount) FROM dm_employees LEFT JOIN dm_departments ON dm_employees.department_level_1 = dm_departments.department_level_1;",
-        "SELECT dm_departments.department_level_1_name, COUNT(dm_employees.id) FROM dm_employees LEFT JOIN dm_departments ON dm_employees.department_level_1 = dm_departments.department_level_1"
+        "SELECT dm_departments.department_level_1_name, COUNT(dm_employees.id) AS headcount FROM dm_employees LEFT JOIN dm_departments ON dm_employees.department_level_1 = dm_departments.department_level_1"
     )]
     #[case::test_multiple_measures(
         "SELECT department_level_1, MEASURE(dm_employees.headcount), MEASURE(dm_employees.ending_headcount) FROM dm_employees;",
-        "SELECT department_level_1, COUNT(dm_employees.id), count(DISTINCT dm_employees.effective_date) FROM dm_employees"
+        "SELECT department_level_1, COUNT(dm_employees.id) AS headcount, count(DISTINCT dm_employees.effective_date) AS ending_headcount FROM dm_employees"
     )]
     #[case::test_union(
         "SELECT department_level_1, MEASURE(dm_employees.headcount), false as is_total FROM dm_employees UNION SELECT null as department_level_1, MEASURE(dm_employees.headcount), true as is_total FROM dm_employees;",
-        "SELECT department_level_1, COUNT(dm_employees.id), false AS is_total FROM dm_employees UNION SELECT NULL AS department_level_1, COUNT(dm_employees.id), true AS is_total FROM dm_employees"
+        "SELECT department_level_1, COUNT(dm_employees.id) AS headcount, false AS is_total FROM dm_employees UNION SELECT NULL AS department_level_1, COUNT(dm_employees.id) AS headcount, true AS is_total FROM dm_employees"
     )]
     #[case::test_subquery(
         "SELECT subquery.department_level_1, MEASURE(dm_employees.headcount) FROM (SELECT * FROM dm_employees) AS subquery;",
-        "SELECT subquery.department_level_1, COUNT(dm_employees.id) FROM (SELECT * FROM dm_employees) AS subquery"
+        "SELECT subquery.department_level_1, COUNT(dm_employees.id) AS headcount FROM (SELECT * FROM dm_employees) AS subquery"
     )]
-    // #[case::interval_statement_in_dialect(
-    //     "SELECT '1 day'::interval as interval_column",
-    //     "SELECT INTERVAL '1 day' as interval_column"
-    // )]
-    // as -> AS, correct or not
-    // 11, 10
     #[case::test_case_statement(
         "SELECT CASE WHEN department_level_1 = 'a' THEN 'a' WHEN department_level_1 = 'b' THEN 'b' ELSE 'c' END as case_column FROM dm_employees;",
         "SELECT CASE WHEN department_level_1 = 'a' THEN 'a' WHEN department_level_1 = 'b' THEN 'b' ELSE 'c' END AS case_column FROM dm_employees"
     )]
     #[case::test_distinct_on_snowflake_dialect(
         "SELECT DISTINCT ON (department_level_1) department_level_1, MEASURE(dm_employees.headcount) FROM dm_employees;",
-        "SELECT DISTINCT ON (department_level_1) department_level_1, COUNT(dm_employees.id) FROM dm_employees"
+        "SELECT DISTINCT ON (department_level_1) department_level_1, COUNT(dm_employees.id) AS headcount FROM dm_employees"
     )]
     fn test_parser_on_postgres(#[case] initial_query: &str, #[case] expected_query: &str) {
         let sql_parser = sql_parser_fixture();

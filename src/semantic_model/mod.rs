@@ -1,5 +1,5 @@
 pub mod local_store;
-mod s3_store;
+pub mod s3_store;
 
 use std::collections::HashMap;
 use thiserror::Error;
@@ -55,4 +55,19 @@ pub trait SemanticModelStore: Clone {
 pub enum SemanticModelStoreError {
     #[error("Measure not found")]
     MeasureNotFound,
+
+    #[error("Model not found")]
+    ModelNotFound,
+
+    #[error("File not found: {0}")]
+    FileNotFound(String),
+
+    #[error("Invalid JSON format")]
+    InvalidJsonFormat,
+
+    #[error("Invalid JSON path")]
+    InvalidJsonPath,
+
+    #[error("Env var not set")]
+    EnvVarNotSet,
 }

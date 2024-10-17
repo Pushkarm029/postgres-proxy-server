@@ -1,7 +1,8 @@
 use crate::data_store::DataStoreClient;
-use crate::query_handler::QueryHandler;
 use crate::semantic_model::SemanticModelStore;
+use crate::sql_parser::SqlParser;
 use async_trait::async_trait;
+use log::debug;
 use pgwire::api::results::Response;
 use pgwire::api::{
     auth::noop::NoopStartupHandler,
@@ -10,15 +11,54 @@ use pgwire::api::{
     PgWireHandlerFactory,
 };
 use pgwire::error::PgWireResult;
+use pgwire::error::{ErrorInfo, PgWireError};
 use std::sync::Arc;
-use tokio::sync::Mutex;
 
-pub struct Processor<D, S> {
-    query_handler: Arc<Mutex<QueryHandler<D, S>>>,
+pub struct QueryHandler<D, S> {
+    data_store: D,
+    semantic_model: S,
+}
+
+impl<D, S> QueryHandler<D, S>
+where
+    D: DataStoreClient,
+    S: SemanticModelStore,
+{
+    pub fn new(data_store: D, semantic_model: S) -> Self {
+        Self {
+            data_store,
+            semantic_model,
+        }
+    }
+
+    pub async fn handle(&self, query: &str) -> PgWireResult<Vec<Response>> {
+        debug!("Initial query: {}", query);
+        let sql = SqlParser::new(D::get_mapping(), self.semantic_model.clone())
+            .parse(query)
+            .map_err(|e| {
+                PgWireError::UserError(Box::new(ErrorInfo::new(
+                    "SQLSTATE".to_string(),
+                    "ERROR".to_string(), // Add this line
+                    e.to_string(),
+                )))
+            })?;
+        debug!("Transformed query: {}", sql);
+
+        // Execute the sql and return the result
+        let result = self.data_store.execute(&sql).await.map_err(|e| {
+            PgWireError::UserError(Box::new(ErrorInfo::new(
+                "SQLSTATE".to_string(),
+                "ERROR".to_string(), // Add this line
+                e.to_string(),
+            )))
+        })?;
+
+        Ok(result)
+    }
 }
 
 #[async_trait]
-impl<D, S> SimpleQueryHandler for Processor<D, S>
+impl<D, S> SimpleQueryHandler for QueryHandler<D, S>
 where
     D: DataStoreClient + Send + Sync,
     S: SemanticModelStore + Send + Sync,
@@ -27,27 +67,16 @@ where
         &self,
         _client: &mut C,
         query: &'a str,
-    ) -> PgWireResult<Vec<Response<'a>>> {
-        let query_handler = self.query_handler.lock().await;
-        query_handler.handle(query).await.unwrap();
-        todo!("Map result to pgwire response");
-    }
-}
-
-impl<D, S> Processor<D, S>
-where
-    D: DataStoreClient,
-    S: SemanticModelStore,
-{
-    pub fn new(data_store: D, semantic_model: S) -> Self {
-        Self {
-            query_handler: Arc::new(Mutex::new(QueryHandler::new(data_store, semantic_model))),
-        }
+    ) -> PgWireResult<Vec<Response<'a>>>
+    where
+        'life0: 'a,
+    {
+        self.handle(query).await
     }
 }
 
 pub struct ProcessorFactory<D, S> {
-    handler: Arc<Processor<D, S>>,
+    handler: Arc<QueryHandler<D, S>>,
 }
 
 impl<D, S> ProcessorFactory<D, S>
@@ -57,7 +86,7 @@ where
 {
     pub fn new(data_store: D, semantic_model: S) -> Self {
         Self {
-            handler: Arc::new(Processor::new(data_store, semantic_model)),
+            handler: Arc::new(QueryHandler::new(data_store, semantic_model)),
         }
     }
 }
@@ -68,7 +97,7 @@ where
     S: SemanticModelStore + Send + Sync,
 {
     type StartupHandler = NoopStartupHandler;
-    type SimpleQueryHandler = Processor<D, S>;
+    type SimpleQueryHandler = QueryHandler<D, S>;
     type ExtendedQueryHandler = PlaceholderExtendedQueryHandler;
     type CopyHandler = NoopCopyHandler;
 

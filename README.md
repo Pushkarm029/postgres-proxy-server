@@ -4,17 +4,17 @@
 
 1. **Start Postgres in Docker:**
    ```bash
-   make setup-db
+   make setup-postgres
    ```
 
 2. **Create and Populate Databases:**
    ```bash
-   make create-db populate-db
+   make create-postgres populate-postgres
    ```
 
-3. **Run the PGWire Server:**
+3. **Run the Proxy Server in Local Mode:**
    ```bash
-   make local-pg-run
+   make local-run
    ```
 
 4. **Connect to the Proxy Server:**
@@ -23,7 +23,6 @@
    ```
 
 ## Testing
-   **Currently**, you have to populate db following above steps to run tests successfully.
    ```bash
    make test
    ```
@@ -49,23 +48,66 @@
 
 ## Environment Variables
 
-- **SCHEMA_DB_CONN_STRING**: Address of the schema database (`information_schema`).
-  
-  Default: `postgres://postgres:postgres@localhost:5432/information_schema`
+- **SERVER_HOST**: Host address for the server.  
+  Default: `127.0.0.1`
 
-- **DATA_DB_CONN_STRING**: Address of the main database (`main`).
-  
-  Default: `postgres://postgres:postgres@localhost:5432/main`
+- **SERVER_PORT**: Port number for the server.  
+  Default: `5433`
 
-- **SERVER_ADDR**: Proxy server address (`127.0.0.1:5433`).
+- **POSTGRES_USER**: PostgreSQL username.  
+  Default: `postgres`
+
+- **POSTGRES_PASSWORD**: PostgreSQL password.  
+  Default: `postgres`
+
+- **POSTGRES_HOST**: PostgreSQL host address.  
+  Default: `localhost:5432`
+
+- **POSTGRES_DB**: PostgreSQL database name.  
+  Default: `main`
+
+- **SNOWFLAKE_ACCOUNT**: Snowflake account identifier.  
+  Default: *None*
+
+- **SNOWFLAKE_USER**: Snowflake username.  
+  Default: *None*
+
+- **SNOWFLAKE_PASSWORD**: Snowflake password.  
+  Default: *None*
+
+- **SNOWFLAKE_WAREHOUSE**: Snowflake warehouse name (optional).  
+  Default: *None*
+
+- **SNOWFLAKE_DATABASE**: Snowflake database name (optional).  
+  Default: *None*
+
+- **SNOWFLAKE_SCHEMA**: Snowflake schema name (optional).  
+  Default: *None*
+
+- **SNOWFLAKE_ROLE**: Snowflake role name (optional).  
+  Default: *None*
+
+- **SNOWFLAKE_TIMEOUT**: Timeout for Snowflake connection in seconds (optional).  
+  Default: *None*
+
+- **TENANT**: Tenant name for S3.  
+  Default: *None*
+
+- **S3_BUCKET_NAME**: Name of the S3 bucket.  
+  Default: *None*
+
+- **JSON_PATH**: Path to the JSON file for the semantic model.  
+  Default: *None*
 
 ## Makefile Commands
 
-- `make setup-db`: Pull and run Postgres in Docker.
-- `make create-db`: Create the necessary databases.
-- `make populate-db`: Populate the `main` database with sample data.
-- `make populate-schema`: Populate the `information_schema` with schema definitions.
-- `make run-proxy`: Start the PGWire proxy server.
+- `make setup-postgres`: Pull and run Postgres in Docker.
+- `make create-postgres`: Create the necessary databases.
+- `make populate-postgres`: Populate the main database with sample data.
+- `make local-run`: Start the PGWire proxy server in local mode.
+- `make production-run`: Start the PGWire proxy server in production mode.
+- `make test`: Run the test suite.
+- `make teardown`: Stop and remove Docker containers.
 - `make clean`: Stop and clean up containers and build files.
 
 ## Troubleshooting

@@ -2,7 +2,9 @@ pub mod postgres;
 pub mod snowflake;
 
 use async_trait::async_trait;
+use bytes::BytesMut;
 use pgwire::api::results::Response;
+use std::error::Error;
 use std::fmt;
 
 /// DataStoreMapping handles the mapping logic for types and functions
@@ -45,7 +47,6 @@ pub trait DataStoreClient {
 pub enum DataStoreError {
     ConnectionError(String),
     QueryError(String),
-    InsufficientPrivileges(String),
     ColumnNotFound(String),
 }
 
@@ -58,12 +59,23 @@ impl fmt::Display for DataStoreError {
             DataStoreError::QueryError(details) => {
                 write!(f, "Query error: {}", details)
             }
-            DataStoreError::InsufficientPrivileges(details) => {
-                write!(f, "Insufficient privileges: {}", details)
-            }
             DataStoreError::ColumnNotFound(details) => {
                 write!(f, "Column not found: {}", details)
             }
+        }
+    }
+}
+
+impl Error for DataStoreError {}
+
+pub fn encode_value(buffer: &mut BytesMut, value: Option<String>) {
+    match value {
+        Some(v) => {
+            buffer.extend_from_slice(&(v.len() as i32).to_be_bytes());
+            buffer.extend_from_slice(v.as_bytes());
+        }
+        None => {
+            buffer.extend_from_slice(&(-1_i32).to_be_bytes());
         }
     }
 }

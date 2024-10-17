@@ -1,4 +1,4 @@
-use crate::utils::config::S3Config;
+use crate::config::S3Config;
 
 use super::{Measure, SemanticModel, SemanticModelStore, SemanticModelStoreError};
 use aws_sdk_s3::{config::BehaviorVersion, Client};
@@ -56,7 +56,7 @@ impl S3SemanticModelStore {
 
         let keys = result
             .contents()
-            .into_iter()
+            .iter()
             .map(|c| c.key().unwrap().to_string())
             .filter(|k| k.ends_with(".json"))
             .collect();
