@@ -116,3 +116,15 @@ impl SemanticModelJSONConfig {
         Ok(config)
     }
 }
+
+#[derive(Envconfig)]
+pub struct AuthConfig {
+    #[envconfig(from = "PASSWORD", default = "postgres")]
+    pub password: String,
+}
+
+impl AuthConfig {
+    pub fn new() -> Result<Self, envconfig::Error> {
+        Self::init_from_env()
+    }
+}

@@ -1,11 +1,13 @@
+use crate::config::AuthConfig;
 use crate::data_store::DataStoreClient;
 use crate::semantic_model::SemanticModelStore;
 use crate::sql_parser::SqlParser;
 use async_trait::async_trait;
 use log::debug;
+use pgwire::api::auth::md5pass::{hash_md5_password, Md5PasswordAuthStartupHandler};
+use pgwire::api::auth::{AuthSource, DefaultServerParameterProvider, LoginInfo, Password};
 use pgwire::api::results::Response;
 use pgwire::api::{
-    auth::noop::NoopStartupHandler,
     copy::NoopCopyHandler,
     query::{PlaceholderExtendedQueryHandler, SimpleQueryHandler},
     PgWireHandlerFactory,
@@ -13,6 +15,23 @@ use pgwire::api::{
 use pgwire::error::PgWireResult;
 use pgwire::error::{ErrorInfo, PgWireError};
 use std::sync::Arc;
+
+pub struct Authentication;
+
+#[async_trait]
+impl AuthSource for Authentication {
+    async fn get_password(&self, login_info: &LoginInfo) -> PgWireResult<Password> {
+        let salt = vec![0, 0, 0, 0];
+        let password = AuthConfig::new().unwrap().password;
+
+        let hash_password = hash_md5_password(
+            login_info.user().as_ref().unwrap(),
+            &password,
+            salt.as_ref(),
+        );
+        Ok(Password::new(Some(salt), hash_password.as_bytes().to_vec()))
+    }
+}
 
 pub struct QueryHandler<D, S> {
     data_store: D,
@@ -96,7 +115,8 @@ where
     D: DataStoreClient + Send + Sync,
     S: SemanticModelStore + Send + Sync,
 {
-    type StartupHandler = NoopStartupHandler;
+    type StartupHandler =
+        Md5PasswordAuthStartupHandler<Authentication, DefaultServerParameterProvider>;
     type SimpleQueryHandler = QueryHandler<D, S>;
     type ExtendedQueryHandler = PlaceholderExtendedQueryHandler;
     type CopyHandler = NoopCopyHandler;
@@ -110,7 +130,10 @@ where
     }
 
     fn startup_handler(&self) -> Arc<Self::StartupHandler> {
-        Arc::new(NoopStartupHandler)
+        Arc::new(Md5PasswordAuthStartupHandler::new(
+            Arc::new(Authentication),
+            Arc::new(DefaultServerParameterProvider::default()),
+        ))
     }
 
     fn copy_handler(&self) -> Arc<Self::CopyHandler> {
