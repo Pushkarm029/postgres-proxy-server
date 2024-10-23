@@ -1,18 +1,75 @@
+use crate::config::AuthConfig;
 use crate::data_store::DataStoreClient;
 use crate::semantic_model::SemanticModelStore;
 use crate::sql_parser::SqlParser;
 use async_trait::async_trait;
 use log::debug;
+use pgwire::api::auth::cleartext::CleartextPasswordAuthStartupHandler;
+use pgwire::api::auth::{AuthSource, DefaultServerParameterProvider, LoginInfo, Password};
 use pgwire::api::results::Response;
 use pgwire::api::{
-    auth::noop::NoopStartupHandler,
     copy::NoopCopyHandler,
     query::{PlaceholderExtendedQueryHandler, SimpleQueryHandler},
     PgWireHandlerFactory,
 };
 use pgwire::error::PgWireResult;
 use pgwire::error::{ErrorInfo, PgWireError};
+use std::collections::HashMap;
 use std::sync::Arc;
+use thiserror::Error;
+
+pub struct Authentication {
+    pairs: HashMap<String, String>,
+}
+
+impl Authentication {
+    pub fn from_env() -> Self {
+        let pairs = AuthConfig::get_pairs();
+
+        Self { pairs }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum AuthError {
+    #[error("Missing username")]
+    MissingUsername,
+    #[error("Invalid credentials")]
+    InvalidCredentials,
+    #[error("Internal error: {0}")]
+    Internal(String),
+}
+
+#[async_trait]
+impl AuthSource for Authentication {
+    async fn get_password(&self, login_info: &LoginInfo) -> PgWireResult<Password> {
+        let username = login_info
+            .user()
+            .ok_or(AuthError::MissingUsername)
+            .map_err(|e| {
+                PgWireError::UserError(Box::new(ErrorInfo::new(
+                    "SQLSTATE".to_string(),
+                    "ERROR".to_string(),
+                    e.to_string(),
+                )))
+            })?
+            .to_string();
+
+        let password = self
+            .pairs
+            .get(&username)
+            .ok_or(AuthError::InvalidCredentials)
+            .map_err(|e| {
+                PgWireError::UserError(Box::new(ErrorInfo::new(
+                    "SQLSTATE".to_string(),
+                    "ERROR".to_string(),
+                    e.to_string(),
+                )))
+            })?;
+
+        Ok(Password::new(None, password.as_bytes().to_vec()))
+    }
+}
 
 pub struct QueryHandler<D, S> {
     data_store: D,
@@ -96,7 +153,8 @@ where
     D: DataStoreClient + Send + Sync,
     S: SemanticModelStore + Send + Sync,
 {
-    type StartupHandler = NoopStartupHandler;
+    type StartupHandler =
+        CleartextPasswordAuthStartupHandler<Authentication, DefaultServerParameterProvider>;
     type SimpleQueryHandler = QueryHandler<D, S>;
     type ExtendedQueryHandler = PlaceholderExtendedQueryHandler;
     type CopyHandler = NoopCopyHandler;
@@ -110,7 +168,10 @@ where
     }
 
     fn startup_handler(&self) -> Arc<Self::StartupHandler> {
-        Arc::new(NoopStartupHandler)
+        Arc::new(CleartextPasswordAuthStartupHandler::new(
+            Authentication::from_env(),
+            DefaultServerParameterProvider::default(),
+        ))
     }
 
     fn copy_handler(&self) -> Arc<Self::CopyHandler> {

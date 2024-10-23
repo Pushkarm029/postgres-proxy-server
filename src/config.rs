@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use envconfig::Envconfig;
 use log::debug;
+use log::error;
 
 #[derive(Envconfig)]
 pub struct Config {
@@ -114,5 +117,37 @@ impl SemanticModelJSONConfig {
             config.json_path
         );
         Ok(config)
+    }
+}
+
+#[derive(Envconfig)]
+pub struct AuthConfig {
+    #[envconfig(from = "AUTH", default = "admin,password;manager,password2")]
+    pub user_password_pair: String,
+}
+
+impl AuthConfig {
+    pub fn get_pairs() -> HashMap<String, String> {
+        let config = Self::init_from_env()
+            .map_err(|e| {
+                error!("Failed to initialize AuthConfig: {}", e);
+                e
+            })
+            .unwrap();
+
+        let pairs: HashMap<String, String> = config
+            .user_password_pair
+            .split(';')
+            .filter_map(|pair| {
+                let parts: Vec<&str> = pair.split(',').collect();
+                if parts.len() == 2 {
+                    Some((parts[0].to_string(), parts[1].to_string()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        pairs
     }
 }
