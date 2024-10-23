@@ -14,10 +14,21 @@ use pgwire::api::{
 };
 use pgwire::error::PgWireResult;
 use pgwire::error::{ErrorInfo, PgWireError};
+use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 
-pub struct Authentication;
+pub struct Authentication {
+    pairs: HashMap<String, String>,
+}
+
+impl Authentication {
+    pub fn from_env() -> Self {
+        let pairs = AuthConfig::get_pairs();
+
+        Self { pairs }
+    }
+}
 
 #[derive(Error, Debug)]
 pub enum AuthError {
@@ -32,8 +43,6 @@ pub enum AuthError {
 #[async_trait]
 impl AuthSource for Authentication {
     async fn get_password(&self, login_info: &LoginInfo) -> PgWireResult<Password> {
-        let auth_config = AuthConfig::get_pairs();
-
         let username = login_info
             .user()
             .ok_or(AuthError::MissingUsername)
@@ -46,15 +55,9 @@ impl AuthSource for Authentication {
             })?
             .to_string();
 
-        let password = auth_config
-            .iter()
-            .find_map(|(stored_username, stored_password)| {
-                if *stored_username == username {
-                    Some(stored_password.clone())
-                } else {
-                    None
-                }
-            })
+        let password = self
+            .pairs
+            .get(&username)
             .ok_or(AuthError::InvalidCredentials)
             .map_err(|e| {
                 PgWireError::UserError(Box::new(ErrorInfo::new(
@@ -166,7 +169,7 @@ where
 
     fn startup_handler(&self) -> Arc<Self::StartupHandler> {
         Arc::new(CleartextPasswordAuthStartupHandler::new(
-            Authentication,
+            Authentication::from_env(),
             DefaultServerParameterProvider::default(),
         ))
     }

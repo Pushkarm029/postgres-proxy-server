@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use envconfig::Envconfig;
 use log::debug;
 use log::error;
@@ -125,7 +127,7 @@ pub struct AuthConfig {
 }
 
 impl AuthConfig {
-    pub fn get_pairs() -> Vec<(String, String)> {
+    pub fn get_pairs() -> HashMap<String, String> {
         let config = Self::init_from_env()
             .map_err(|e| {
                 error!("Failed to initialize AuthConfig: {}", e);
@@ -133,7 +135,7 @@ impl AuthConfig {
             })
             .unwrap();
 
-        let pairs: Vec<(String, String)> = config
+        let pairs: HashMap<String, String> = config
             .user_password_pair
             .split(';')
             .filter_map(|pair| {
