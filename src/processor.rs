@@ -15,20 +15,58 @@ use pgwire::api::{
 use pgwire::error::PgWireResult;
 use pgwire::error::{ErrorInfo, PgWireError};
 use std::sync::Arc;
+use thiserror::Error;
 
 pub struct Authentication;
+
+#[derive(Error, Debug)]
+pub enum AuthError {
+    #[error("Missing username")]
+    MissingUsername,
+    #[error("Invalid credentials")]
+    InvalidCredentials,
+    #[error("Internal error: {0}")]
+    Internal(String),
+}
 
 #[async_trait]
 impl AuthSource for Authentication {
     async fn get_password(&self, login_info: &LoginInfo) -> PgWireResult<Password> {
-        let salt = vec![0, 0, 0, 0];
-        let password = AuthConfig::new().unwrap().password;
+        let salt = vec![0x01, 0x02, 0x03, 0x04];
+        let auth_config = AuthConfig::get_pairs();
 
-        let hash_password = hash_md5_password(
-            login_info.user().as_ref().unwrap(),
-            &password,
-            salt.as_ref(),
-        );
+        let username = login_info
+            .user()
+            .ok_or(AuthError::MissingUsername)
+            .map_err(|e| {
+                PgWireError::UserError(Box::new(ErrorInfo::new(
+                    "SQLSTATE".to_string(),
+                    "ERROR".to_string(),
+                    e.to_string(),
+                )))
+            })?
+            .to_string();
+
+        let password = auth_config
+            .iter()
+            .find_map(|(stored_username, stored_password)| {
+                if *stored_username == username {
+                    Some(stored_password.clone())
+                } else {
+                    None
+                }
+            })
+            .ok_or(AuthError::InvalidCredentials)
+            .map_err(|e| {
+                PgWireError::UserError(Box::new(ErrorInfo::new(
+                    "SQLSTATE".to_string(),
+                    "ERROR".to_string(),
+                    e.to_string(),
+                )))
+            })?;
+
+        let hash_password = hash_md5_password(&username, &password, &salt);
+
         Ok(Password::new(Some(salt), hash_password.as_bytes().to_vec()))
     }
 }

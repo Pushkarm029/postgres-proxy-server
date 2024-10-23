@@ -1,5 +1,6 @@
 use envconfig::Envconfig;
 use log::debug;
+use log::error;
 
 #[derive(Envconfig)]
 pub struct Config {
@@ -119,12 +120,32 @@ impl SemanticModelJSONConfig {
 
 #[derive(Envconfig)]
 pub struct AuthConfig {
-    #[envconfig(from = "PASSWORD", default = "postgres")]
-    pub password: String,
+    #[envconfig(from = "PASSWORD", default = "admin,password;manager,password2")]
+    pub user_password_pair: String,
 }
 
 impl AuthConfig {
-    pub fn new() -> Result<Self, envconfig::Error> {
-        Self::init_from_env()
+    pub fn get_pairs() -> Vec<(String, String)> {
+        let config = Self::init_from_env()
+            .map_err(|e| {
+                error!("Failed to initialize AuthConfig: {}", e);
+                e
+            })
+            .unwrap();
+
+        let pairs: Vec<(String, String)> = config
+            .user_password_pair
+            .split(';')
+            .filter_map(|pair| {
+                let parts: Vec<&str> = pair.split(',').collect();
+                if parts.len() == 2 {
+                    Some((parts[0].to_string(), parts[1].to_string()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        pairs
     }
 }
