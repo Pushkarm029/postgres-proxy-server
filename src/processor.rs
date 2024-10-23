@@ -4,7 +4,7 @@ use crate::semantic_model::SemanticModelStore;
 use crate::sql_parser::SqlParser;
 use async_trait::async_trait;
 use log::debug;
-use pgwire::api::auth::md5pass::{hash_md5_password, Md5PasswordAuthStartupHandler};
+use pgwire::api::auth::cleartext::CleartextPasswordAuthStartupHandler;
 use pgwire::api::auth::{AuthSource, DefaultServerParameterProvider, LoginInfo, Password};
 use pgwire::api::results::Response;
 use pgwire::api::{
@@ -32,7 +32,6 @@ pub enum AuthError {
 #[async_trait]
 impl AuthSource for Authentication {
     async fn get_password(&self, login_info: &LoginInfo) -> PgWireResult<Password> {
-        let salt = vec![0x01, 0x02, 0x03, 0x04];
         let auth_config = AuthConfig::get_pairs();
 
         let username = login_info
@@ -65,9 +64,7 @@ impl AuthSource for Authentication {
                 )))
             })?;
 
-        let hash_password = hash_md5_password(&username, &password, &salt);
-
-        Ok(Password::new(Some(salt), hash_password.as_bytes().to_vec()))
+        Ok(Password::new(None, password.as_bytes().to_vec()))
     }
 }
 
@@ -154,7 +151,7 @@ where
     S: SemanticModelStore + Send + Sync,
 {
     type StartupHandler =
-        Md5PasswordAuthStartupHandler<Authentication, DefaultServerParameterProvider>;
+        CleartextPasswordAuthStartupHandler<Authentication, DefaultServerParameterProvider>;
     type SimpleQueryHandler = QueryHandler<D, S>;
     type ExtendedQueryHandler = PlaceholderExtendedQueryHandler;
     type CopyHandler = NoopCopyHandler;
@@ -168,9 +165,9 @@ where
     }
 
     fn startup_handler(&self) -> Arc<Self::StartupHandler> {
-        Arc::new(Md5PasswordAuthStartupHandler::new(
-            Arc::new(Authentication),
-            Arc::new(DefaultServerParameterProvider::default()),
+        Arc::new(CleartextPasswordAuthStartupHandler::new(
+            Authentication,
+            DefaultServerParameterProvider::default(),
         ))
     }
 

@@ -120,7 +120,7 @@ impl SemanticModelJSONConfig {
 
 #[derive(Envconfig)]
 pub struct AuthConfig {
-    #[envconfig(from = "PASSWORD", default = "admin,password;manager,password2")]
+    #[envconfig(from = "AUTH", default = "admin,password;manager,password2")]
     pub user_password_pair: String,
 }
 
