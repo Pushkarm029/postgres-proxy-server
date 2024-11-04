@@ -1,4 +1,4 @@
-# MVP
+# eqtble-sql
 
 ## Steps to Run
 

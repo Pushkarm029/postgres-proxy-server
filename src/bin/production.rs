@@ -1,7 +1,7 @@
 use log::error;
 use std::process;
 
-use postgres_proxy_server::{
+use eqtble_sql::{
     config::{Config, S3Config, SnowflakeConfig},
     data_store::snowflake::SnowflakeDataStore,
     processor::ProcessorFactory,

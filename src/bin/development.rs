@@ -2,8 +2,8 @@ use log::error;
 use std::process;
 
 use eqtble_sql::{
-    config::{Config, PostgresConfig},
-    data_store::postgres::PostgresDataStore,
+    config::{Config, SnowflakeConfig},
+    data_store::snowflake::SnowflakeDataStore,
     processor::ProcessorFactory,
     semantic_model::local_store::LocalSemanticModelStore,
     ProxyServer,
@@ -18,17 +18,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         e
     })?;
 
-    let postgres_config = PostgresConfig::new().map_err(|e| {
-        error!("Failed to initialize Postgres config: {}", e);
+    let snowflake_config = SnowflakeConfig::new().map_err(|e| {
+        error!("Failed to initialize Snowflake config: {}", e);
         e
     })?;
 
-    let data_store = PostgresDataStore::new(postgres_config).await.map_err(|e| {
-        error!("Failed to create PostgresDataStore: {}", e);
+    let data_store = SnowflakeDataStore::new(snowflake_config).map_err(|e| {
+        error!("Failed to create SnowflakeDataStore: {}", e);
         e
     })?;
 
-    let semantic_model_store = LocalSemanticModelStore::new()?;
+    let semantic_model_store = LocalSemanticModelStore::new().map_err(|e| {
+        error!("Failed to create LocalSemanticModelStore: {}", e);
+        e
+    })?;
 
     let factory = ProcessorFactory::new(data_store, semantic_model_store);
 

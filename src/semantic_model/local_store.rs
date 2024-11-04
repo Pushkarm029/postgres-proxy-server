@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 
+use super::measure::SimpleMeasure;
 use super::{Dimension, Measure, SemanticModel, SemanticModelStore, SemanticModelStoreError};
 use crate::config::SemanticModelJSONConfig;
-use log::error;
 use log::warn;
+use log::{debug, error};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
@@ -28,7 +29,13 @@ impl LocalSemanticModelStore {
             Ok(config) => {
                 if Path::new(&config.json_path).exists() {
                     match Self::load_from_json(&config.json_path) {
-                        Ok(store) => Ok(store),
+                        Ok(store) => {
+                            debug!(
+                                "Loaded semantic models from JSON: {:?}",
+                                store.semantic_models.keys()
+                            );
+                            Ok(store)
+                        }
                         Err(e) => {
                             error!(
                                 "Failed to load from JSON: {}. Falling back to mock data.",
@@ -59,35 +66,33 @@ impl LocalSemanticModelStore {
             label: "Employees".to_string(),
             description: "Dimensional model for employee data".to_string(),
             measures: vec![
-                Measure {
+                Measure::Simple(SimpleMeasure {
                     name: "headcount".to_string(),
                     description: "Count of distinct employees included in headcount".to_string(),
                     data_type: "INTEGER".to_string(),
-                    aggregation: "COUNT_DISTINCT".to_string(),
+                    aggregation: "count".to_string(),
                     // sql: "COUNT(DISTINCT CASE WHEN dm_employees.included_in_headcount THEN dm_employees.id ELSE NULL END)".to_string(),
                     // Use simpler re-write for easier to read test cases
-                    sql: "COUNT(dm_employees.id)".to_string(),
-                },
-                Measure {
+                    sql: "dm_employees.id".to_string(),
+                }),
+                Measure::Simple(SimpleMeasure {
                     name: "ending_headcount".to_string(),
                     description: "Count of distinct effective dates for employees".to_string(),
                     data_type: "INTEGER".to_string(),
-                    aggregation: "COUNT_DISTINCT".to_string(),
-                    sql: "count(distinct dm_employees.effective_date)".to_string(),
-                },
+                    aggregation: "count_distinct".to_string(),
+                    sql: "dm_employees.effective_date".to_string(),
+                }),
             ],
             dimensions: vec![
                 Dimension {
                     name: "department_level_1".to_string(),
                     description: "Top level department of the employee".to_string(),
                     data_type: "STRING".to_string(),
-                    is_primary_key: false,
                 },
                 Dimension {
                     name: "id".to_string(),
                     description: "Unique identifier for the employee".to_string(),
                     data_type: "INTEGER".to_string(),
-                    is_primary_key: true,
                 },
                 Dimension {
                     name: "included_in_headcount".to_string(),
@@ -95,7 +100,6 @@ impl LocalSemanticModelStore {
                         "Flag indicating if the employee is included in headcount calculations"
                             .to_string(),
                     data_type: "BOOLEAN".to_string(),
-                    is_primary_key: false,
                 },
                 // You can add more dimensions here if needed
             ],
@@ -127,12 +131,6 @@ impl SemanticModelStore for LocalSemanticModelStore {
         measure_name: &str,
     ) -> Result<Measure, SemanticModelStoreError> {
         let semantic_model = self.get_semantic_model(table_name)?;
-
-        semantic_model
-            .measures
-            .iter()
-            .find(|measure| measure.name == measure_name)
-            .cloned()
-            .ok_or(SemanticModelStoreError::MeasureNotFound)
+        semantic_model.get_measure(measure_name).map(|m| m.clone())
     }
 }

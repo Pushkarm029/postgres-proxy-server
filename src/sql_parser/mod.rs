@@ -142,7 +142,7 @@ mod test {
     )]
     #[case::test_multiple_measures(
         "SELECT department_level_1, MEASURE(dm_employees.headcount), MEASURE(dm_employees.ending_headcount) FROM dm_employees;",
-        "SELECT department_level_1, COUNT(dm_employees.id) AS headcount, count(DISTINCT dm_employees.effective_date) AS ending_headcount FROM dm_employees"
+        "SELECT department_level_1, COUNT(dm_employees.id) AS headcount, COUNT(DISTINCT dm_employees.effective_date) AS ending_headcount FROM dm_employees"
     )]
     #[case::test_union(
         "SELECT department_level_1, MEASURE(dm_employees.headcount), false as is_total FROM dm_employees UNION SELECT null as department_level_1, MEASURE(dm_employees.headcount), true as is_total FROM dm_employees;",

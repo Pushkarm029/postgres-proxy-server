@@ -1,6 +1,8 @@
 pub mod local_store;
+pub mod measure;
 pub mod s3_store;
 
+use measure::Measure;
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -15,13 +17,13 @@ pub struct SemanticModel {
     pub dimensions: Vec<Dimension>,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Measure {
-    pub name: String,
-    pub description: String,
-    pub data_type: String,
-    pub aggregation: String,
-    pub sql: String,
+impl SemanticModel {
+    pub fn get_measure(&self, name: &str) -> Result<&Measure, SemanticModelStoreError> {
+        self.measures
+            .iter()
+            .find(|m| m.name() == name)
+            .ok_or(SemanticModelStoreError::MeasureNotFound)
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -29,7 +31,6 @@ pub struct Dimension {
     pub name: String,
     pub description: String,
     pub data_type: String,
-    pub is_primary_key: bool,
 }
 
 /// [`SemanticModel`] store
@@ -55,6 +56,9 @@ pub trait SemanticModelStore: Clone {
 pub enum SemanticModelStoreError {
     #[error("Measure not found")]
     MeasureNotFound,
+
+    #[error("Dimension not found")]
+    DimensionNotFound,
 
     #[error("Model not found")]
     ModelNotFound,

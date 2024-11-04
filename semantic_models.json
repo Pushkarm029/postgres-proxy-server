@@ -1,0 +1,80 @@
+{
+  "semantic_models": {
+    "dm_employees": {
+      "name": "dm_employees",
+      "label": "Employees",
+      "description": "A table containing employee data.",
+      "dimensions": [
+        {
+          "name": "employee_pk",
+          "description": "The primary key of the employee.",
+          "data_type": "string"
+        }
+      ],
+      "measures": []
+    },
+    "mv_historical_headcount": {
+      "name": "mv_historical_headcount",
+      "label": "Historical Headcount",
+      "description": "A table containing historical headcount data.",
+      "measures": [
+        {
+          "name": "age",
+          "label": "Age",
+          "description": "The age of the employee population.",
+          "data_type": "number",
+          "aggregation": "median",
+          "sql": "mv_historical_headcount.age"
+        },
+        {
+          "name": "average_headcount",
+          "label": "Average Headcount",
+          "description": "The average employee headcount in a given time period, calculated by summing the headcount of each day in the period and diving by the number of days.",
+          "data_type": "number",
+          "measure_type": "ratio",
+          "numerator": {
+            "name": "sum_of_headcount"
+          },
+          "denominator": {
+            "name": "number_of_days_in_period"
+          }
+        },
+        {
+          "name": "sum_of_headcount",
+          "label": "Sum of Headcount",
+          "description": "The number of employees at the beginning of the time period.",
+          "data_type": "number",
+          "aggregation": "sum",
+          "measure_type": "cumulative",
+          "sql": "COUNT(CASE WHEN mv_historical_headcount.included_in_headcount THEN mv_historical_headcount.employee_pk END)",
+          "partition_by": ["MIN(mv_historical_headcount.effective_date)"]
+        },
+        {
+          "name": "number_of_days_in_period",
+          "label": "Number of Days in Period",
+          "description": "The number of days in the period.",
+          "data_type": "number",
+          "aggregation": "count_distinct",
+          "sql": "mv_historical_headcount.effective_date"
+        }
+      ],
+      "dimensions": [
+        {
+          "name": "employee_pk",
+          "description": "The primary key of the employee.",
+          "data_type": "string"
+        },
+        {
+          "name": "effective_date",
+          "description": "The effective date of the headcount.",
+          "data_type": "timestamp"
+        },
+        {
+          "name": "included_in_headcount",
+          "description": "Whether the employee was included in the headcount for the given effective date.",
+          "data_type": "boolean"
+        }
+      ]
+    }
+  }
+}

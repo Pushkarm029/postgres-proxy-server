@@ -72,6 +72,7 @@ impl DataStoreClient for SnowflakeDataStore {
     }
 
     async fn execute(&self, query: &str) -> Result<Vec<Response>, DataStoreError> {
+        println!("Executing SQL: {}", query);
         let session = self.connect().await?;
 
         let rows = session

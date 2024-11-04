@@ -1,4 +1,5 @@
 use crate::data_store::DataStoreMapping;
+use crate::semantic_model::measure::Renderable;
 use crate::semantic_model::SemanticModelStore;
 use crate::sql_parser::SqlTransformError;
 use sqlparser::ast::*;
@@ -194,11 +195,19 @@ fn rewrite_measure<D: DataStoreMapping, S: SemanticModelStore>(
     let ident = get_identifier_from_args(args)?;
     let (table_name, measure_name) = get_measure_info(&ident)?;
 
-    let measure = semantic_model
-        .get_measure(table_name, measure_name)
+    let model = semantic_model
+        .get_semantic_model(table_name)
         .map_err(|e| SqlTransformError::SemanticModelError(e.to_string()))?;
 
-    let expr = parse_measure_sql(&measure.sql, data_store.get_dialect())?;
+    let measure = model
+        .get_measure(measure_name)
+        .map_err(|e| SqlTransformError::SemanticModelError(e.to_string()))?;
+
+    let sql = measure
+        .render(&model, true)
+        .map_err(|e| SqlTransformError::SemanticModelError(e.to_string()))?;
+
+    let expr = parse_measure_sql(&sql, data_store.get_dialect())?;
 
     *func = Function {
         name: ObjectName(vec![Ident::new(expr.to_string())]),

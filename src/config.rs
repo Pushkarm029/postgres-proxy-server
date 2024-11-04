@@ -9,7 +9,7 @@ pub struct Config {
     #[envconfig(from = "SERVER_HOST", default = "127.0.0.1")]
     pub server_host: String,
 
-    #[envconfig(from = "SERVER_PORT", default = "5433")]
+    #[envconfig(from = "SERVER_PORT", default = "5432")]
     pub server_port: u16,
 }
 
@@ -105,7 +105,7 @@ impl S3Config {
 
 #[derive(Envconfig, Clone)]
 pub struct SemanticModelJSONConfig {
-    #[envconfig(from = "JSON_PATH")]
+    #[envconfig(from = "JSON_PATH", default = "semantic_models.json")]
     pub json_path: String,
 }
 

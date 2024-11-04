@@ -104,16 +104,7 @@ impl SemanticModelStore for S3SemanticModelStore {
         measure_name: &str,
     ) -> Result<Measure, SemanticModelStoreError> {
         let semantic_model = self.get_semantic_model(table_name)?;
-        // Lookup the measure in the semantic model measures vector
-        let measure = semantic_model
-            .measures
-            .iter()
-            .find(|m| m.name == measure_name);
-
-        if let Some(measure) = measure {
-            Ok(measure.clone())
-        } else {
-            Err(SemanticModelStoreError::MeasureNotFound)
-        }
+        let measure = semantic_model.get_measure(measure_name)?;
+        Ok(measure.clone())
     }
 }
