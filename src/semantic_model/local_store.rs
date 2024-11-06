@@ -131,6 +131,6 @@ impl SemanticModelStore for LocalSemanticModelStore {
         measure_name: &str,
     ) -> Result<Measure, SemanticModelStoreError> {
         let semantic_model = self.get_semantic_model(table_name)?;
-        semantic_model.get_measure(measure_name).map(|m| m.clone())
+        semantic_model.get_measure(measure_name).cloned()
     }
 }

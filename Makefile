@@ -4,7 +4,7 @@ DB_NAME = main
 DB_USER = postgres
 DB_PASSWORD = postgres
 DB_HOST = localhost
-DB_PORT = 5432
+DB_PORT = 5433
 
 # Section: Postgres & Local
 test: 
@@ -25,7 +25,7 @@ production-run:
 # Shared commands for both configurations
 setup-postgres:
 	@echo "Starting Postgres container..."
-	@docker run --name postgres -e POSTGRES_PASSWORD=$(DB_PASSWORD) -p $(DB_PORT):$(DB_PORT) -d postgres
+	@docker run --name postgres -e POSTGRES_PASSWORD=$(DB_PASSWORD) -p $(DB_PORT):5432 -d postgres
 	@echo "Waiting for Postgres to be ready..."
 	@sleep 2
 

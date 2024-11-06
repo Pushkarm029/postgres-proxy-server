@@ -3,18 +3,15 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum MeasureType {
+    #[default]
     Simple,
     Ratio,
     Cumulative,
     Derived,
 }
 
-impl Default for MeasureType {
-    fn default() -> Self {
-        MeasureType::Simple
-    }
-}
 
 #[derive(Debug, Serialize, Clone)]
 pub enum Measure {

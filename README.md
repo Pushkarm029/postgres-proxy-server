@@ -19,7 +19,7 @@
 
 4. **Connect to the Proxy Server:**
    ```bash
-   psql postgres://postgres:postgres@127.0.0.1:5433/main
+   psql postgres://postgres:postgres@127.0.0.1:5432/main
    ```
 
 ## Testing

@@ -30,7 +30,7 @@ pub struct PostgresConfig {
     pub user: String,
     #[envconfig(from = "POSTGRES_PASSWORD", default = "postgres")]
     pub password: String,
-    #[envconfig(from = "POSTGRES_HOST", default = "localhost:5432")]
+    #[envconfig(from = "POSTGRES_HOST", default = "localhost:5433")]
     pub host: String,
     #[envconfig(from = "POSTGRES_DB", default = "main")]
     pub dbname: String,
