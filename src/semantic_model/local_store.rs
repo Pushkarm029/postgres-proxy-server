@@ -5,13 +5,13 @@ use super::{Dimension, Measure, SemanticModel, SemanticModelStore, SemanticModel
 use crate::config::SemanticModelJSONConfig;
 use log::warn;
 use log::{debug, error};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct LocalSemanticModelStore {
-    semantic_models: HashMap<String, SemanticModel>,
+    semantic_models: BTreeMap<String, SemanticModel>,
 }
 
 impl LocalSemanticModelStore {
@@ -60,7 +60,7 @@ impl LocalSemanticModelStore {
     }
 
     pub fn mock() -> Self {
-        let mut semantic_models = HashMap::new();
+        let mut semantic_models = BTreeMap::new();
         let employees_model = SemanticModel {
             name: "dm_employees".to_string(),
             label: "Employees".to_string(),
@@ -104,8 +104,20 @@ impl LocalSemanticModelStore {
                 // You can add more dimensions here if needed
             ],
         };
+        let dm_dept_model = SemanticModel {
+            name: "dm_departments".to_string(),
+            label: "Departments".to_string(),
+            description: "Dimensional model for department data".to_string(),
+            measures: vec![],
+            dimensions: vec![Dimension {
+                name: "department_level_1_name".to_string(),
+                description: "Top level department of the employee".to_string(),
+                data_type: "STRING".to_string(),
+            }],
+        };
 
         semantic_models.insert(employees_model.name.clone(), employees_model);
+        semantic_models.insert(dm_dept_model.name.clone(), dm_dept_model);
 
         LocalSemanticModelStore { semantic_models }
     }
@@ -121,7 +133,7 @@ impl SemanticModelStore for LocalSemanticModelStore {
 
     fn get_all_semantic_models(
         &self,
-    ) -> Result<HashMap<String, SemanticModel>, SemanticModelStoreError> {
+    ) -> Result<BTreeMap<String, SemanticModel>, SemanticModelStoreError> {
         Ok(self.semantic_models.clone())
     }
 

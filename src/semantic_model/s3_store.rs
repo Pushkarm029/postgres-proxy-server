@@ -2,7 +2,7 @@ use crate::config::S3Config;
 
 use super::{Measure, SemanticModel, SemanticModelStore, SemanticModelStoreError};
 use aws_sdk_s3::{config::BehaviorVersion, Client};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::error::Error;
 use tokio::runtime::Runtime;
 
@@ -83,11 +83,11 @@ impl SemanticModelStore for S3SemanticModelStore {
 
     fn get_all_semantic_models(
         &self,
-    ) -> Result<HashMap<String, SemanticModel>, SemanticModelStoreError> {
+    ) -> Result<BTreeMap<String, SemanticModel>, SemanticModelStoreError> {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
             let keys = self.list_objects().await.unwrap();
-            let mut semantic_models = HashMap::new();
+            let mut semantic_models = BTreeMap::new();
             for key in keys {
                 if let Some(name) = key.strip_suffix(".json") {
                     let semantic_model = self.get_semantic_model(name)?;

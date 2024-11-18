@@ -1,7 +1,7 @@
 use crate::auth::Authentication;
 use crate::data_store::DataStoreClient;
 use crate::semantic_model::SemanticModelStore;
-use crate::sql_parser::SqlParser;
+use crate::sql_parser::{SqlError, SqlParser};
 use async_trait::async_trait;
 use log::debug;
 use pgwire::api::auth::cleartext::CleartextPasswordAuthStartupHandler;
@@ -35,27 +35,29 @@ where
 
     pub async fn handle(&self, query: &str) -> PgWireResult<Vec<Response>> {
         debug!("Initial query: {}", query);
-        let sql = SqlParser::new(D::get_mapping(), self.semantic_model.clone())
-            .parse(query)
-            .map_err(|e| {
-                PgWireError::UserError(Box::new(ErrorInfo::new(
-                    "SQLSTATE".to_string(),
-                    "ERROR".to_string(), // Add this line
-                    e.to_string(),
-                )))
-            })?;
-        debug!("Transformed query: {}", sql);
-
-        // Execute the sql and return the result
-        let result = self.data_store.execute(&sql).await.map_err(|e| {
-            PgWireError::UserError(Box::new(ErrorInfo::new(
+        let parser = SqlParser::new(D::get_mapping(), self.semantic_model.clone());
+        match parser.transform(query) {
+            Ok(sql) => {
+                debug!("Transformed query: {}", &sql);
+                // Execute the sql and return the result
+                self.data_store.execute(&sql).await.map_err(|e| {
+                    PgWireError::UserError(Box::new(ErrorInfo::new(
+                        "SQLSTATE".to_string(),
+                        "ERROR".to_string(),
+                        e.to_string(),
+                    )))
+                })
+            }
+            Err(SqlError::InformationSchemaResult(info)) => {
+                // TODO: Return the information schema result
+                todo!()
+            }
+            Err(e) => Err(PgWireError::UserError(Box::new(ErrorInfo::new(
                 "SQLSTATE".to_string(),
-                "ERROR".to_string(), // Add this line
+                "ERROR".to_string(),
                 e.to_string(),
-            )))
-        })?;
-
-        Ok(result)
+            )))),
+        }
     }
 }
 

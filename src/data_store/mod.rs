@@ -29,7 +29,7 @@ pub trait DataStoreMapping {
 /// results from the DataStore.
 #[async_trait]
 pub trait DataStoreClient {
-    type Mapping: DataStoreMapping;
+    type Mapping: DataStoreMapping + Send;
 
     fn get_mapping() -> Self::Mapping;
 

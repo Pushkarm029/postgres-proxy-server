@@ -3,7 +3,7 @@ pub mod measure;
 pub mod s3_store;
 
 use measure::Measure;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use thiserror::Error;
 
 use serde::{Deserialize, Serialize};
@@ -42,7 +42,7 @@ pub trait SemanticModelStore: Clone {
     fn get_semantic_model(&self, name: &str) -> Result<SemanticModel, SemanticModelStoreError>;
     fn get_all_semantic_models(
         &self,
-    ) -> Result<HashMap<String, SemanticModel>, SemanticModelStoreError>;
+    ) -> Result<BTreeMap<String, SemanticModel>, SemanticModelStoreError>;
     fn get_measure(
         &self,
         table_name: &str,
